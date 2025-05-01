@@ -1,0 +1,41 @@
+- name: Ensure Grafana directories exist
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ grafana.dir }}"
+    - "{{ grafana.provisioning_dir }}"
+    - "{{ grafana.dashboards_dir }}"
+
+- name: Synchronize Grafana provisioning config
+  synchronize:
+    src: provisioning/
+    dest: "{{ grafana.provisioning_dir }}"
+    recursive: yes
+  notify: Restart grafana
+
+- name: Copy Grafana dashboards
+  copy:
+    src: dashboards/
+    dest: "{{ grafana.dashboards_dir }}"
+    mode: '0644'
+  notify: Restart grafana
+
+- name: Create Grafana data volume
+  docker_volume:
+    name: "{{ grafana.volume }}"
+    state: present
+
+- name: Run Grafana container
+  docker_container:
+    name: "{{ grafana.container_name }}"
+    image: "{{ grafana.image }}"
+    restart_policy: always
+    network_mode: host
+    volumes:
+      - "{{ grafana.volume }}:/var/lib/grafana"
+      - "{{ grafana.provisioning_dir }}:/etc/grafana/provisioning"
+      - "{{ grafana.dashboards_dir }}:/etc/grafana/provisioning/dashboards"
+    env:
+      GF_PROVISIONING_DATASOURCES_ALLOW_DELETION: "true"

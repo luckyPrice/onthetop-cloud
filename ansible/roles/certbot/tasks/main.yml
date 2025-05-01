@@ -1,0 +1,58 @@
+- name: Install cron (for certbot renew cronjob)
+  apt:
+    name: cron
+    state: present
+
+- name: Install certbot and nginx plugin
+  apt:
+    name:
+      - certbot
+      - python3-certbot-nginx
+    state: present
+
+- name: Stop nginx before certbot issue
+  systemd:
+    name: nginx
+    state: stopped
+
+- name: Obtain SSL certificate for prometheus
+  command: >
+    certbot certonly --standalone
+    --non-interactive
+    --agree-tos
+    --email "{{ certbot_email }}"
+    -d "{{ prometheus.domain }}"
+  args:
+    creates: "/etc/letsencrypt/live/{{ prometheus.domain }}/fullchain.pem"
+
+- name: Obtain SSL certificate for grafana
+  command: >
+    certbot certonly --standalone
+    --non-interactive
+    --agree-tos
+    --email "{{ certbot_email }}"
+    -d "{{ grafana.domain }}"
+  args:
+    creates: "/etc/letsencrypt/live/{{ grafana.domain }}/fullchain.pem"
+
+- name: Obtain SSL certificate for alertmanager
+  command: >
+    certbot certonly --standalone
+    --non-interactive
+    --agree-tos
+    --email "{{ certbot_email }}"
+    -d "{{ alertmanager.domain }}"
+  args:
+    creates: "/etc/letsencrypt/live/{{ alertmanager.domain }}/fullchain.pem"
+
+- name: Start nginx after certbot issue
+  systemd:
+    name: nginx
+    state: started
+
+- name: Setup automatic certificate renewal with nginx reload
+  cron:
+    name: "Renew Let's Encrypt certificates and reload nginx"
+    job: "certbot renew --quiet --deploy-hook 'systemctl reload nginx'"
+    minute: 0
+    hour: 12
