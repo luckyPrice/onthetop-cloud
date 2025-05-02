@@ -1,0 +1,96 @@
+groups:
+  - name: system_alerts
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU 사용량이 80% 이상 유지됨"
+          description: "Instance {{ $labels.instance }}의 CPU 사용량이 80%를 초과했습니다. (30분 이상 유지)"
+
+      - alert: CriticalCPUUsage
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CPU 사용량이 90% 이상 유지됨"
+          description: "Instance {{ $labels.instance }}의 CPU 사용량이 90%를 초과했습니다. (1분 이상 유지)"
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "메모리 사용량이 80% 이상 유지됨"
+          description: "Instance {{ $labels.instance }}의 메모리 사용량이 80%를 초과했습니다. (5분 이상 유지)"
+
+      - alert: CriticalMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "메모리 사용량이 90% 이상 유지됨"
+          description: "Instance {{ $labels.instance }}의 메모리 사용량이 90%를 초과했습니다. (1분 이상 유지)"
+
+      - alert: HighDiskUsage
+        expr: (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > 80
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "디스크 사용량이 80% 이상 유지됨"
+          description: "Instance {{ $labels.instance }}의 디스크 사용량이 80%를 초과했습니다. (1시간 이상 유지)"
+
+      - alert: PrometheusTargetMissing
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus 타겟 다운 감지"
+          description: "Instance {{ $labels.instance }}의 Prometheus 스크래핑 타겟이 5분 동안 응답하지 않음."
+
+      - alert: AlertmanagerDown
+        expr: alertmanager_up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Alertmanager 다운 감지"
+          description: "Alertmanager가 5분 동안 응답하지 않음."
+
+  - name: blackbox_alerts
+    interval: 30s
+    rules:
+      - alert: FrontendDown
+        expr: probe_http_status_code{instance=~".*:3000"} != 200
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Frontend 서비스 장애"
+          description: "Instance {{ $labels.instance }}의 Frontend(3000) 서비스가 10분 동안 응답하지 않음."
+
+      - alert: BackendDown
+        expr: probe_http_status_code{instance=~".*:8080"} != 200
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend 서비스 장애"
+          description: "Instance {{ $labels.instance }}의 Backend(8080) 서비스가 10분 동안 응답하지 않음."
+
+      - alert: AIDown
+        expr: probe_http_status_code{instance=~".*:8000"} != 200
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AI 서비스 장애"
+          description: "Instance {{ $labels.instance }}의 AI(8000) 서비스가 10분 동안 응답하지 않음."

@@ -1,0 +1,13 @@
+- hosts: all
+  become: true
+  roles:
+    - common
+
+- hosts: monitoring
+  become: true
+  roles:
+    - certbot
+    - nginx
+    - prometheus
+    - grafana
+    - alertmanager

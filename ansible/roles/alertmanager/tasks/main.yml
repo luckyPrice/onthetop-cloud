@@ -1,0 +1,20 @@
+- name: Ensure Alertmanager directory exists
+  file:
+    path: "{{ alertmanager.dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Copy Alertmanager config
+  copy:
+    src: alertmanager.yml
+    dest: "{{ alertmanager.config }}"
+  notify: Restart alertmanager
+
+- name: Run Alertmanager container
+  docker_container:
+    name: "{{ alertmanager.container_name }}"
+    image: "{{ alertmanager.image }}"
+    restart_policy: always
+    network_mode: host
+    volumes:
+      - "{{ alertmanager.config }}:/etc/alertmanager/alertmanager.yml"

@@ -1,0 +1,4 @@
+- name: Reload nginx after certbot issue
+  systemd:
+    name: nginx
+    state: reloaded

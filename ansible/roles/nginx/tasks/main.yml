@@ -1,0 +1,25 @@
+- name: Install nginx
+  apt:
+    name: nginx
+    state: present
+
+- name: Ensure nginx is started
+  systemd:
+    name: nginx
+    state: started
+    enabled: yes
+
+- name: Deploy nginx config
+  copy:
+    src: nginx.conf
+    dest: "{{ nginx.config_path }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart nginx
+
+# - name: Allow HTTP and HTTPS in UFW
+#   ufw:
+#     rule: allow
+#     port: "{{ item }}"
+#   loop: "{{ nginx_ports }}"

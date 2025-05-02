@@ -1,0 +1,30 @@
+- name: Install required packages (with cache update)
+  apt:
+    name:
+      - docker.io
+      - rsync
+    state: present
+    update_cache: yes
+
+- name: Ensure docker group exists
+  group:
+    name: docker
+    state: present
+
+- name: Add user to Docker group
+  user:
+    name: ubuntu
+    groups: docker
+    append: yes
+
+- name: Start and enable Docker
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Ensure monitoring base directory exists
+  file:
+    path: "{{ monitoring_base_dir }}"
+    state: directory
+    mode: '0755'

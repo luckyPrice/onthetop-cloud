@@ -1,0 +1,22 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: "discord-webhook"
+  group_by: ['alertname', 'instance']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: "discord-webhook"
+    discord_configs:
+      - webhook_url: "<디스코드 웹훅 URL>"
+        send_resolved: false
+        title: "**🚨 [{{ .CommonLabels.alertname }}] 발생! 🚨**"
+        content: |
+          **🔹 인스턴스:** {{ .CommonLabels.instance }}
+          **⚠️ 심각도:** {{ .CommonLabels.severity }}
+          **🛠 설명:** {{ .CommonAnnotations.description }}
+          **🔔 알람끄러가기:** <Alertmanager URL>
+        username: "Hot6비상!!"

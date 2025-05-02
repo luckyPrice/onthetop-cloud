@@ -1,0 +1,53 @@
+monitoring_base_dir: /opt/monitoring
+
+prometheus_dir: "{{ monitoring_base_dir }}"
+alertmanager_dir: "{{ monitoring_base_dir }}/alertmanager"
+grafana_dir: "{{ monitoring_base_dir }}/grafana"
+
+# 서비스 도메인 (여기에 사용할 실제 도메인을 입력하세요)
+monitoring_domains:
+  prometheus: prometheus.example.com
+  grafana: grafana.example.com
+  alertmanager: alertmanager.example.com
+
+# Prometheus 설정
+prometheus:
+  dir: "{{ prometheus_dir }}"
+  config: "{{ prometheus_dir }}/prometheus.yml"
+  alert_rules: "{{ prometheus_dir }}/alert-rules.yml"
+  volume: prometheus_data
+  container_name: prometheus
+  image: prom/prometheus:latest
+  port: 9090
+  domain: "{{ monitoring_domains.prometheus }}"
+
+# Alertmanager 설정
+alertmanager:
+  dir: "{{ alertmanager_dir }}"
+  config: "{{ alertmanager_dir }}/alertmanager.yml"
+  volume: alertmanager_data
+  container_name: alertmanager
+  image: prom/alertmanager:latest
+  port: 9093
+  domain: "{{ monitoring_domains.alertmanager }}"
+
+# Grafana 설정
+grafana:
+  dir: "{{ grafana_dir }}"
+  provisioning_dir: "{{ grafana_dir }}/provisioning"
+  dashboards_dir: "{{ grafana_dir }}/dashboards"
+  volume: grafana_data
+  container_name: grafana
+  image: grafana/grafana:latest
+  port: 3000
+  domain: "{{ monitoring_domains.grafana }}"
+
+# Nginx 설정
+nginx:
+  config_path: /etc/nginx/nginx.conf
+  ports:
+    - 80
+    - 443
+
+# Certbot (인증서 발급용 이메일 주소)
+certbot_email: admin@example.com

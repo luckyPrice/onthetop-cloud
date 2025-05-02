@@ -1,0 +1,31 @@
+- name: Copy Prometheus config
+  copy:
+    src: prometheus.yml
+    dest: "{{ prometheus.config }}"
+  notify: Restart prometheus
+
+- name: Copy Alert Rules
+  copy:
+    src: alert-rules.yml
+    dest: "{{ prometheus.alert_rules }}"
+  notify: Restart prometheus
+
+- name: Create Prometheus data volume
+  docker_volume:
+    name: "{{ prometheus.volume }}"
+    state: present
+
+- name: Run Prometheus container
+  docker_container:
+    name: "{{ prometheus.container_name }}"
+    image: "{{ prometheus.image }}"
+    restart_policy: always
+    network_mode: host
+    volumes:
+      - "{{ prometheus.config }}:/etc/prometheus/prometheus.yml"
+      - "{{ prometheus.alert_rules }}:/etc/prometheus/alert-rules.yml"
+      - "{{ prometheus.volume }}:/prometheus"
+    command: >
+      --config.file=/etc/prometheus/prometheus.yml
+      --web.enable-lifecycle
+      --storage.tsdb.path=/prometheus
