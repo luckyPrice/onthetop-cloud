@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e  # 에러 발생 시 즉시 종료
+set -e
 
 PROJECT_DIR="$HOME/ai-server"
 VENV_DIR="$PROJECT_DIR/venv"
@@ -28,7 +28,7 @@ pip install --upgrade pip
 pip install -r requirements.txt
 
 echo "▶️ [6] 실행 중인 FastAPI 프로세스 종료"
-PID=$(pgrep -f "uvicorn .*${APP_MODULE}" || true)
+PID=$(pgrep -f "uvicorn" || true)
 
 if [ -n "$PID" ]; then
   echo "기존 프로세스 종료중 (PID: $PID)"
