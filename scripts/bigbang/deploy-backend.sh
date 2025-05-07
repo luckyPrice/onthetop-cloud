@@ -53,6 +53,6 @@ echo "로그 파일: $PROJECT_DIR/app.log"
 
 echo "▶️ [7] 기동 상태 확인 (10초 후 로그 확인)"
 sleep 10
-tail -n 60 "$PROJECT_DIR/app.log"
+tail -n 100 "$PROJECT_DIR/app.log"
 
 echo "🎉 BE 배포 완료!"
