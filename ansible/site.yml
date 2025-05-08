@@ -11,3 +11,14 @@
     - prometheus
     - grafana
     - alertmanager
+
+- hosts: blackbox
+  become: true
+  roles:
+    - blackbox_exporter
+
+- hosts: monitoring_targets_dev
+  become: true
+  roles:
+    - node_exporter
+    - { role: mysql_exporter, when: "'mysql_servers' in group_names" }
