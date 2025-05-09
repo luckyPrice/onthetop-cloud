@@ -3,7 +3,7 @@ modules:
     prober: http
     timeout: 5s
     http:
-      valid_http_versions: ["HTTP/1.1", "HTTP/2"]
+      valid_http_versions: ["HTTP/1.1"]
       method: GET
       tls_config:
-        insecure_skip_verify: true
+        insecure_skip_verify: false
