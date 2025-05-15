@@ -43,6 +43,7 @@ prometheus.yml*
 alertmanager.yml
 nginx.conf
 all.yml
+ansible/roles/promtail/templates/config.yml.j2
 
 .DS_Store
 .vscode

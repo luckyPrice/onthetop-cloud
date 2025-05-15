@@ -1,0 +1,28 @@
+- name: Create Loki config directory
+  file:
+    path: "{{ loki.dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Create Loki data volume
+  docker_volume:
+    name: "{{ loki.volume }}"
+    state: present
+
+- name: Deploy Loki config
+  template:
+    src: config.yml.j2
+    dest: "{{ loki.config }}"
+    mode: '0644'
+  notify: Restart loki
+
+- name: Run Loki container
+  docker_container:
+    name: "{{ loki.container_name }}"
+    image: "{{ loki.image }}"
+    restart_policy: always
+    network_mode: host
+    volumes:
+      - "{{ loki.config }}:/etc/loki/config.yml"
+      - "{{ loki.volume }}:/loki"
+    command: -config.file=/etc/loki/config.yml

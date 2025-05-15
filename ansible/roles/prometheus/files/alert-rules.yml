@@ -68,7 +68,7 @@ groups:
   - name: blackbox_alerts
     interval: 30s
     rules:
-      - alert: FrontendDown
+      - alert: FrontendHttpsDown
         expr: probe_success{instance="dev-frontend", job="blackbox_http"} == 0
         for: 10m
         labels:
@@ -77,7 +77,7 @@ groups:
           summary: "Dev Frontend 서비스 장애"
           description: "Dev Frontend (dev-onthe-top.com)이 10분 동안 응답하지 않음."
 
-      - alert: BackendDown
+      - alert: BackendHttpsDown
         expr: probe_success{instance="dev-backend", job="blackbox_http"} == 0
         for: 10m
         labels:
@@ -85,3 +85,12 @@ groups:
         annotations:
           summary: "Dev Backend 서비스 장애"
           description: "Dev Backend (dev-backend.onthe-top.com/api/v1/health)가 10분 동안 응답하지 않음."
+
+      - alert: AiHttpsDown
+        expr: probe_success{instance="dev-ai", job="blackbox_http"} == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Dev Ai 서비스 장애"
+          description: "Dev Ai (dev-ai.onthe-top.com/health)가 10분 동안 응답하지 않음."
