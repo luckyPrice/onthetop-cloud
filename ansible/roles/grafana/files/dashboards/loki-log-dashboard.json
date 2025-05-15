@@ -1,0 +1,194 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 14,
+  "links": [],
+  "liveNow": true,
+  "panels": [
+    {
+      "datasource": "Loki",
+      "description": "태그에 따라 제일 첫 줄만 보여줍니다. 세부 로그는 아래에서 확인하세요~\n\n위 쪽이 최신 로그입니다.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "dedupStrategy": "none",
+        "enableInfiniteScrolling": false,
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": false,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "pluginVersion": "11.6.1",
+      "targets": [
+        {
+          "datasource": "Loki",
+          "direction": "backward",
+          "editorMode": "code",
+          "expr": "{job=\"$job\", environment=\"$environment\"} \n|= \"DEBUG\"\n| line_format `➡️ 🔵 {{ regexReplaceAll \"level=debug|ts=[^\\\\s]+\\\\s\" __line__ \"\" | trim }}`\n",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "datasource": "Loki",
+          "direction": "backward",
+          "editorMode": "code",
+          "expr": "{job=\"$job\", environment=\"$environment\"} \n|= \"INFO\"\n| line_format `➡️ 🟢 {{ regexReplaceAll \"level=info|ts=[^\\\\s]+\\\\s\" __line__ \"\" | trim }}`\n",
+          "hide": false,
+          "queryType": "range",
+          "refId": "B"
+        },
+        {
+          "datasource": "Loki",
+          "direction": "backward",
+          "editorMode": "code",
+          "expr": "{job=\"$job\", environment=\"$environment\"} \n|= \"WARN\"\n| line_format `➡️ 🟡 {{ regexReplaceAll \"level=warn|ts=[^\\\\s]+\\\\s\" __line__ \"\" | trim }}`\n",
+          "hide": false,
+          "queryType": "range",
+          "refId": "C"
+        },
+        {
+          "datasource": "Loki",
+          "direction": "backward",
+          "editorMode": "code",
+          "expr": "{job=\"$job\", environment=\"$environment\"} \n|= \"ERROR\"\n| line_format `➡️ 🔴 {{ regexReplaceAll \"level=error|ts=[^\\\\s]+\\\\s\" __line__ \"\" | trim }}`\n",
+          "hide": false,
+          "queryType": "range",
+          "refId": "D"
+        }
+      ],
+      "title": "태그별 로그",
+      "type": "logs"
+    },
+    {
+      "datasource": "Loki",
+      "description": "실제 cat 이나 tail 출력처럼 아래가 최신입니다!",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "id": 2,
+      "options": {
+        "dedupStrategy": "none",
+        "enableInfiniteScrolling": false,
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Ascending",
+        "wrapLogMessage": false
+      },
+      "pluginVersion": "11.6.1",
+      "targets": [
+        {
+          "datasource": "Loki",
+          "direction": "backward",
+          "editorMode": "code",
+          "expr": "{job=\"$job\", environment=\"$environment\"} ",
+          "hide": false,
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "전체 로그",
+      "type": "logs"
+    }
+  ],
+  "preload": false,
+  "refresh": "1m",
+  "schemaVersion": 41,
+  "tags": [
+    "Promtail",
+    "Loki"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "ai",
+          "value": "ai"
+        },
+        "datasource": "Loki",
+        "definition": "",
+        "label": "Job",
+        "name": "job",
+        "options": [],
+        "query": {
+          "label": "job",
+          "refId": "LokiVariableQueryEditor-VariableQuery",
+          "stream": "",
+          "type": 1
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {
+          "text": "dev",
+          "value": "dev"
+        },
+        "datasource": "Loki",
+        "definition": "",
+        "label": "Environment",
+        "name": "environment",
+        "options": [],
+        "query": {
+          "label": "environment",
+          "refId": "LokiVariableQueryEditor-VariableQuery",
+          "stream": "",
+          "type": 1
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "AI/BE Promtail Loki Log Dashboard",
+  "uid": "log-dashboard",
+  "version": 14
+}

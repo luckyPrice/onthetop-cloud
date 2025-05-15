@@ -1,0 +1,5 @@
+- name: Restart loki
+  docker_container:
+    name: "{{ loki.container_name }}"
+    image: "{{ loki.image }}"
+    restart: true

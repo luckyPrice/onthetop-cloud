@@ -1,0 +1,29 @@
+- name: Create Promtail config directory
+  file:
+    path: "{{ promtail.dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Deploy Promtail config
+  template:
+    src: config.yml.j2
+    dest: "{{ promtail.config }}"
+    mode: '0644'
+  notify: Restart promtail
+
+- name: Create Promtail position volume
+  docker_volume:
+    name: "{{ promtail.volume }}"
+    state: present
+
+- name: Run Promtail container
+  docker_container:
+    name: "{{ promtail.container_name }}"
+    image: "{{ promtail.image }}:{{ promtail.version }}"
+    restart_policy: always
+    network_mode: host
+    volumes:
+      - "{{ promtail.config }}:/etc/promtail/config.yml"
+      - /var/log/onthetop:/var/log/onthetop
+      - "{{ promtail.volume }}:/etc/promtail/positions"
+    command: -config.file=/etc/promtail/config.yml
