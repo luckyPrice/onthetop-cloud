@@ -68,29 +68,59 @@ groups:
   - name: blackbox_alerts
     interval: 30s
     rules:
-      - alert: FrontendHttpsDown
+      # DEV
+      - alert: DevFrontendHttpsDown
         expr: probe_success{instance="dev-frontend", job="blackbox_http"} == 0
         for: 10m
         labels:
           severity: critical
         annotations:
           summary: "Dev Frontend 서비스 장애"
-          description: "Dev Frontend (dev-onthe-top.com)이 10분 동안 응답하지 않음."
+          description: "Dev Frontend (https://dev.onthe-top.com)이 10분 동안 응답하지 않음."
 
-      - alert: BackendHttpsDown
+      - alert: DevBackendHttpsDown
         expr: probe_success{instance="dev-backend", job="blackbox_http"} == 0
         for: 10m
         labels:
           severity: critical
         annotations:
           summary: "Dev Backend 서비스 장애"
-          description: "Dev Backend (dev-backend.onthe-top.com/api/v1/health)가 10분 동안 응답하지 않음."
+          description: "Dev Backend (https://dev-backend.onthe-top.com/api/v1/health)가 10분 동안 응답하지 않음."
 
-      - alert: AiHttpsDown
-        expr: probe_success{instance="dev-ai", job="blackbox_http"} == 0
+      # - alert: DevAiHttpsDown
+      #   expr: probe_success{instance="dev-ai", job="blackbox_http"} == 0
+      #   for: 10m
+      #   labels:
+      #     severity: critical
+      #   annotations:
+      #     summary: "Dev AI 서비스 장애"
+      #     description: "Dev AI (https://dev-ai.onthe-top.com/health)가 10분 동안 응답하지 않음."
+
+      # PROD
+      - alert: ProdFrontendHttpsDown
+        expr: probe_success{instance="prod-frontend", job="blackbox_http"} == 0
         for: 10m
         labels:
           severity: critical
         annotations:
-          summary: "Dev Ai 서비스 장애"
-          description: "Dev Ai (dev-ai.onthe-top.com/health)가 10분 동안 응답하지 않음."
+          summary: "Prod Frontend 서비스 장애"
+          description: "Prod Frontend (https://onthe-top.com)이 10분 동안 응답하지 않음."
+
+      - alert: ProdBackendHttpsDown
+        expr: probe_success{instance="prod-backend", job="blackbox_http"} == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prod Backend 서비스 장애"
+          description: "Prod Backend (https://backend.onthe-top.com/api/v1/health)가 10분 동안 응답하지 않음."
+
+      - alert: ProdAiHttpsDown
+        expr: probe_success{instance="prod-ai", job="blackbox_http"} == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prod AI 서비스 장애"
+          description: "Prod AI (https://ai.onthe-top.com/health)가 10분 동안 응답하지 않음."
+      
