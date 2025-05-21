@@ -51,8 +51,7 @@ jobs:
             --machine-type=e2-small \
             --region=${{ steps.vars.outputs.region }} \
             --network-interface=subnet=onthetop-subnet-prod-private-server-a \
-            --image-family=ubuntu-2404-lts \
-            --image-project=ubuntu-os-cloud \
+            --image=projects/ubuntu-os-cloud/global/images/ubuntu-minimal-2404-noble-amd64-v20250514 \
             --boot-disk-size=20GB \
             --service-account=213622576886-compute@developer.gserviceaccount.com \
             --scopes=https://www.googleapis.com/auth/cloud-platform \
