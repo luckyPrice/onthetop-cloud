@@ -103,29 +103,29 @@ jobs:
             --zone=$ZONE \
             --named-ports=http:8080
 
-      - name: Wait for MIG to become HEALTHY
+      - name: Wait for MIG instance to become HEALTHY
         run: |
           MIG=${{ steps.vars.outputs.mig_name }}
           ZONE=${{ steps.vars.outputs.zone }}
-          BACKEND_SERVICE="onthetop-backend-service"
 
-          echo "⏳ Waiting for MIG to become HEALTHY..."
+          echo "⏳ Waiting for MIG instance to become HEALTHY..."
 
           for i in {1..20}; do
-            STATUS=$(gcloud compute backend-services get-health $BACKEND_SERVICE --global \
-              --format="value(status.healthStatus[0].healthState)")
+            STATUS=$(gcloud compute instance-groups managed list-instances $MIG \
+              --zone=$ZONE \
+              --format="value(healthState)")
 
-            echo "Attempt $i: Health status = $STATUS"
+            echo "Attempt $i: Instance health state = $STATUS"
 
             if [ "$STATUS" = "HEALTHY" ]; then
-              echo "✅ MIG is healthy!"
+              echo "✅ MIG instance is healthy!"
               exit 0
             fi
 
             sleep 15
           done
 
-          echo "❌ MIG did not become healthy in time"
+          echo "❌ MIG instance did not become healthy in time"
           exit 1
 
       - name: Add MIG to Backend Service
