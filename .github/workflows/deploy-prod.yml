@@ -50,14 +50,14 @@ jobs:
           TEMPLATE=${{ steps.vars.outputs.template_name }}
           MIG=${{ steps.vars.outputs.mig_name }}
           ZONE=${{ steps.vars.outputs.zone }}
-      
-          echo "🔍 Checking if instance template exists..."
-          gcloud compute instance-templates describe $TEMPLATE >/dev/null 2>&1 && \
-            gcloud compute instance-templates delete $TEMPLATE --quiet || echo "✅ Template not found. Skipping delete."
-      
+
           echo "🔍 Checking if MIG exists..."
           gcloud compute instance-groups managed describe $MIG --zone=$ZONE >/dev/null 2>&1 && \
             gcloud compute instance-groups managed delete $MIG --zone=$ZONE --quiet || echo "✅ MIG not found. Skipping delete."
+
+          echo "🔍 Checking if instance template exists..."
+          gcloud compute instance-templates describe $TEMPLATE >/dev/null 2>&1 && \
+            gcloud compute instance-templates delete $TEMPLATE --quiet || echo "✅ Template not found. Skipping delete."
         
       - name: (Optional) Ensure Health Check Exists
         run: |
