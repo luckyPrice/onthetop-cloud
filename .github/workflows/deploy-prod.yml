@@ -94,6 +94,15 @@ jobs:
             --health-check=http-health-check \
             --initial-delay=60
 
+      - name: Set Named Port for MIG
+        run: |
+          MIG=${{ steps.vars.outputs.mig_name }}
+          ZONE=${{ steps.vars.outputs.zone }}
+
+          gcloud compute instance-groups managed set-named-ports $MIG \
+            --zone=$ZONE \
+            --named-ports=http:8080
+    
       - name: Add MIG to Backend Service
         run: |
           MIG=${{ steps.vars.outputs.mig_name }}
