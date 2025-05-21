@@ -88,7 +88,7 @@ jobs:
         run: |
           gcloud compute instance-groups managed create ${{ steps.vars.outputs.mig_name }} \
             --base-instance-name=${{ steps.vars.outputs.mig_name }} \
-            --size=2 \
+            --size=1 \
             --template=${{ steps.vars.outputs.template_name }} \
             --zone=${{ steps.vars.outputs.zone }} \
             --health-check=https-health-check \
