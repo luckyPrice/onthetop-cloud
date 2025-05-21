@@ -1,0 +1,71 @@
+name: Create GCP Template and MIG
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '배포할 backend 버전 (예: 1.2.3)'
+        required: true
+      deploy_slot:
+        description: 'Blue/Green 중 어느 슬롯에 배포할지 (예: blue, green)'
+        required: true
+        default: 'green'
+
+jobs:
+  create-template-and-mig:
+    name: Create Template and MIG on GCP
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Infra Repo
+        uses: actions/checkout@v3
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Set up gcloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Set variables
+        id: vars
+        run: |
+          VERSION=${{ github.event.inputs.version }}
+          SLOT=${{ github.event.inputs.deploy_slot }}
+          REGION="asia-northeast3"
+          ZONE="asia-northeast3-a"
+          TEMPLATE_NAME="onthetop-backend-${SLOT}-v${VERSION//./-}"
+          MIG_NAME="onthetop-backend-${SLOT}"
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "slot=$SLOT" >> $GITHUB_OUTPUT
+          echo "region=$REGION" >> $GITHUB_OUTPUT
+          echo "zone=$ZONE" >> $GITHUB_OUTPUT
+          echo "template_name=$TEMPLATE_NAME" >> $GITHUB_OUTPUT
+          echo "mig_name=$MIG_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create Instance Template
+        run: |
+          gcloud compute instance-templates create ${{ steps.vars.outputs.template_name }} \
+            --machine-type=e2-small \
+            --region=${{ steps.vars.outputs.region }} \
+            --network-interface=subnet=onthetop-subnet-prod-private-server-a \
+            --image-family=ubuntu-2204-lts \
+            --image-project=ubuntu-os-cloud \
+            --boot-disk-size=20GB \
+            --service-account=213622576886-compute@developer.gserviceaccount.com \
+            --scopes=https://www.googleapis.com/auth/cloud-platform \
+            --tags=http-server,https-server,onthetop-monitoring-target \
+            --metadata=startup-version=${{ steps.vars.outputs.version }} \
+            --metadata-from-file=startup-script=scripts/cicd/startup.sh
+
+      - name: Create Managed Instance Group (MIG)
+        run: |
+          gcloud compute instance-groups managed create ${{ steps.vars.outputs.mig_name }} \
+            --base-instance-name=${{ steps.vars.outputs.mig_name }} \
+            --size=2 \
+            --template=${{ steps.vars.outputs.template_name }} \
+            --zone=${{ steps.vars.outputs.zone }} \
+            --health-check=https-health-check \
+            --initial-delay=60
