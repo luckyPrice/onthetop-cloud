@@ -4,11 +4,12 @@ prometheus_dir: "{{ monitoring_base_dir }}"
 alertmanager_dir: "{{ monitoring_base_dir }}/alertmanager"
 grafana_dir: "{{ monitoring_base_dir }}/grafana"
 
-# 서비스 도메인 (여기에 사용할 실제 도메인을 입력하세요)
+# 서비스 도메인
 monitoring_domains:
   prometheus: prometheus.example.com
   grafana: grafana.example.com
   alertmanager: alertmanager.example.com
+  loki: loki.example.com
 
 # Prometheus 설정
 prometheus:
@@ -42,6 +43,32 @@ grafana:
   port: 3000
   domain: "{{ monitoring_domains.grafana }}"
 
+# Loki 설정
+loki:
+  dir: "{{ monitoring_base_dir }}/loki"
+  config: "{{ monitoring_base_dir }}/loki/config.yml"
+  volume: loki_data
+  container_name: loki
+  image: grafana/loki:latest
+  port: 3100
+  grpc_port: 9096
+  s3:
+    bucket: "example-logging-bucket"
+    access_key: "YOUR_AWS_ACCESS_KEY"
+    secret_key: "YOUR_AWS_SECRET_KEY"
+    endpoint: s3.ap-northeast-2.amazonaws.com
+    region: ap-northeast-2
+  domain: "{{ monitoring_domains.loki }}"
+
+# Promtail 설정
+promtail:
+  dir: "{{ monitoring_base_dir }}/promtail"
+  config: "{{ monitoring_base_dir }}/promtail/config.yml"
+  volume: promtail_positions
+  container_name: promtail
+  image: grafana/promtail
+  version: latest
+
 # Nginx 설정
 nginx:
   config_path: /etc/nginx/nginx.conf
@@ -52,7 +79,7 @@ nginx:
 # Certbot (인증서 발급용 이메일 주소)
 certbot_email: admin@example.com
 
-# MySQL (MySQL Exporter 용 설정)
+# MySQL Exporter 설정
 mysql:
   exporter_user: exporter
   exporter_password: your_password
