@@ -58,11 +58,11 @@ jobs:
           echo "🔍 Checking if instance template exists..."
           gcloud compute instance-templates describe $TEMPLATE >/dev/null 2>&1 && \
             gcloud compute instance-templates delete $TEMPLATE --quiet || echo "✅ Template not found. Skipping delete."
-        
+
       - name: (Optional) Ensure Health Check Exists
         run: |
-          gcloud compute health-checks describe https-health-check >/dev/null 2>&1 || \
-          gcloud compute health-checks create https https-health-check \
+          gcloud compute health-checks describe http-health-check >/dev/null 2>&1 || \
+          gcloud compute health-checks create http http-health-check \
             --port 8080 \
             --request-path=/api/v1/health \
             --check-interval=30s \
@@ -80,7 +80,7 @@ jobs:
             --boot-disk-size=20GB \
             --service-account=213622576886-compute@developer.gserviceaccount.com \
             --scopes=https://www.googleapis.com/auth/cloud-platform \
-            --tags=http-server,https-server,onthetop-monitoring-target \
+            --tags=http-server,https-server,onthetop-monitoring-target, onthetop-server \
             --metadata=startup-version=${{ steps.vars.outputs.version }} \
             --metadata-from-file=startup-script=scripts/cicd/startup-script.sh
 
@@ -91,5 +91,34 @@ jobs:
             --size=1 \
             --template=${{ steps.vars.outputs.template_name }} \
             --zone=${{ steps.vars.outputs.zone }} \
-            --health-check=https-health-check \
+            --health-check=http-health-check \
             --initial-delay=60
+
+      - name: Add MIG to Backend Service
+        run: |
+          MIG=${{ steps.vars.outputs.mig_name }}
+          ZONE=${{ steps.vars.outputs.zone }}
+          BACKEND_SERVICE="onthetop-backend-service"
+
+          echo "🔄 Replacing backend in $BACKEND_SERVICE with $MIG..."
+
+          # 현재 연결된 MIG 제거 (존재 시)
+          gcloud compute backend-services get-health $BACKEND_SERVICE --global \
+            --format="value(backend[].group)" | grep -q $MIG || {
+              echo "✅ Removing existing backend..."
+              gcloud compute backend-services remove-backend $BACKEND_SERVICE \
+                --global \
+                --instance-group=onthetop-backend-blue \
+                --instance-group-zone=$ZONE || true
+              gcloud compute backend-services remove-backend $BACKEND_SERVICE \
+                --global \
+                --instance-group=onthetop-backend-green \
+                --instance-group-zone=$ZONE || true
+            }
+
+          # 새 MIG 추가
+          gcloud compute backend-services add-backend $BACKEND_SERVICE \
+            --global \
+            --instance-group=$MIG \
+            --instance-group-zone=$ZONE
+    
