@@ -136,23 +136,51 @@ jobs:
 
           echo "🔄 Replacing backend in $BACKEND_SERVICE with $MIG..."
 
-          # 현재 연결된 MIG 제거 (존재 시)
-          gcloud compute backend-services get-health $BACKEND_SERVICE --global \
-            --format="value(backend[].group)" | grep -q $MIG || {
-              echo "✅ Removing existing backend..."
-              gcloud compute backend-services remove-backend $BACKEND_SERVICE \
-                --global \
-                --instance-group=onthetop-backend-blue \
-                --instance-group-zone=$ZONE || true
-              gcloud compute backend-services remove-backend $BACKEND_SERVICE \
-                --global \
-                --instance-group=onthetop-backend-green \
-                --instance-group-zone=$ZONE || true
-            }
-
           # 새 MIG 추가
           gcloud compute backend-services add-backend $BACKEND_SERVICE \
             --global \
             --instance-group=$MIG \
             --instance-group-zone=$ZONE
-    
+
+          MIG_URL="https://www.googleapis.com/compute/v1/projects/onthetop-457202/zones/$ZONE/instanceGroups/$MIG"
+
+          echo "⏳ Waiting for LB to report $MIG as HEALTHY..."
+
+          for i in {1..20}; do
+            STATE=$(gcloud compute backend-services get-health $BACKEND_SERVICE --global --format=json |
+              jq -r --arg MIG "$MIG_URL" '
+                .[] | select(.backend == $MIG) |
+                .status.healthStatus[0].healthState // "UNKNOWN"
+              ' | tr -d '[:space:]')
+
+            echo "Attempt $i: $MIG LB health = '$STATE'"
+
+            if [ "$STATE" = "HEALTHY" ]; then
+              echo "✅ LB sees $MIG as healthy!"
+              break
+            fi
+
+            sleep 15
+          done
+
+          if [ "$STATE" != "HEALTHY" ]; then
+            echo "❌ LB never saw $MIG as healthy in time. Rolling back..."
+            gcloud compute backend-services remove-backend $BACKEND_SERVICE \
+              --global \
+              --instance-group=$MIG \
+              --instance-group-zone=$ZONE || true
+            exit 1
+          fi
+
+          # 🔁 기존 MIG 제거
+          echo "🧹 Removing old MIG from $BACKEND_SERVICE..."
+          if [[ "$MIG" == *"blue" ]]; then
+            OLD_MIG="onthetop-backend-green"
+          else
+            OLD_MIG="onthetop-backend-blue"
+          fi
+
+          gcloud compute backend-services remove-backend $BACKEND_SERVICE \
+            --global \
+            --instance-group=$OLD_MIG \
+            --instance-group-zone=$ZONE || true
