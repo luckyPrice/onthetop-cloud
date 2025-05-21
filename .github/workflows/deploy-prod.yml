@@ -45,6 +45,31 @@ jobs:
           echo "template_name=$TEMPLATE_NAME" >> $GITHUB_OUTPUT
           echo "mig_name=$MIG_NAME" >> $GITHUB_OUTPUT
 
+      - name: Clean up existing template/MIG if exists
+        run: |
+          TEMPLATE=${{ steps.vars.outputs.template_name }}
+          MIG=${{ steps.vars.outputs.mig_name }}
+          ZONE=${{ steps.vars.outputs.zone }}
+      
+          echo "🔍 Checking if instance template exists..."
+          gcloud compute instance-templates describe $TEMPLATE >/dev/null 2>&1 && \
+            gcloud compute instance-templates delete $TEMPLATE --quiet || echo "✅ Template not found. Skipping delete."
+      
+          echo "🔍 Checking if MIG exists..."
+          gcloud compute instance-groups managed describe $MIG --zone=$ZONE >/dev/null 2>&1 && \
+            gcloud compute instance-groups managed delete $MIG --zone=$ZONE --quiet || echo "✅ MIG not found. Skipping delete."
+        
+      - name: (Optional) Ensure Health Check Exists
+        run: |
+          gcloud compute health-checks describe https-health-check >/dev/null 2>&1 || \
+          gcloud compute health-checks create https https-health-check \
+            --port 8080 \
+            --request-path=/api/v1/health \
+            --check-interval=30s \
+            --timeout=10s \
+            --unhealthy-threshold=3 \
+            --healthy-threshold=2
+
       - name: Create Instance Template
         run: |
           gcloud compute instance-templates create ${{ steps.vars.outputs.template_name }} \
