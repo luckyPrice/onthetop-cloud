@@ -64,6 +64,7 @@ echo "🚀 Launching backend.jar..."
 cd "$APP_DIR"
 nohup java -jar backend.jar \
   --spring.config.additional-location=file:$SECRETS_FILE \
+  --spring.profiles.active=prod \
   > "$LOG_DIR/backend.log" 2>&1 &
 
 echo "✅ Backend started."
