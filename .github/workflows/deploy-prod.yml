@@ -92,7 +92,7 @@ jobs:
             --template=${{ steps.vars.outputs.template_name }} \
             --zone=${{ steps.vars.outputs.zone }} \
             --health-check=http-health-check \
-            --initial-delay=60
+            --initial-delay=180
 
       - name: Set Named Port for MIG
         run: |
