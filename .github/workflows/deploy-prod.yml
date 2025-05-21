@@ -111,13 +111,13 @@ jobs:
           echo "⏳ Waiting for all instances in $MIG to become HEALTHY..."
 
           for i in {1..30}; do
-            NOT_YET_HEALTHY=$(gcloud compute instance-groups managed list-instances $MIG \
+            UNHEALTHY_COUNT=$(gcloud compute instance-groups managed list-instances $MIG \
               --zone=$ZONE \
-              --format=json | jq '[.[] | select(.healthState != "HEALTHY")] | length')
+              --format=json | jq '[.[] | select((.instanceHealth[0].detailedHealthState // "") != "HEALTHY")] | length')
 
-            echo "Attempt $i: Unhealthy instance count = $NOT_YET_HEALTHY"
+            echo "Attempt $i: Unhealthy instance count = $UNHEALTHY_COUNT"
 
-            if [ "$NOT_YET_HEALTHY" -eq 0 ]; then
+            if [ "$UNHEALTHY_COUNT" -eq 0 ]; then
               echo "✅ All instances are HEALTHY!"
               exit 0
             fi
