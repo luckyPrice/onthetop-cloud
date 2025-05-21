@@ -1,4 +1,4 @@
-name: Create GCP Template and MIG
+name: Deploy Prod
 
 on:
   workflow_dispatch:
@@ -51,14 +51,14 @@ jobs:
             --machine-type=e2-small \
             --region=${{ steps.vars.outputs.region }} \
             --network-interface=subnet=onthetop-subnet-prod-private-server-a \
-            --image-family=ubuntu-2204-lts \
+            --image-family=ubuntu-2404-lts \
             --image-project=ubuntu-os-cloud \
             --boot-disk-size=20GB \
             --service-account=213622576886-compute@developer.gserviceaccount.com \
             --scopes=https://www.googleapis.com/auth/cloud-platform \
             --tags=http-server,https-server,onthetop-monitoring-target \
             --metadata=startup-version=${{ steps.vars.outputs.version }} \
-            --metadata-from-file=startup-script=scripts/cicd/startup.sh
+            --metadata-from-file=startup-script=scripts/cicd/startup-script.sh
 
       - name: Create Managed Instance Group (MIG)
         run: |
