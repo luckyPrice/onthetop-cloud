@@ -75,7 +75,7 @@ jobs:
           gcloud compute instance-templates create ${{ steps.vars.outputs.template_name }} \
             --machine-type=e2-small \
             --region=${{ steps.vars.outputs.region }} \
-            --network-interface=subnet=onthetop-subnet-prod-private-server-a \
+            --network-interface=subnet=onthetop-subnet-prod-private-server-a,no-address \
             --image=projects/ubuntu-os-cloud/global/images/ubuntu-minimal-2404-noble-amd64-v20250514 \
             --boot-disk-size=20GB \
             --service-account=213622576886-compute@developer.gserviceaccount.com \
@@ -102,7 +102,32 @@ jobs:
           gcloud compute instance-groups managed set-named-ports $MIG \
             --zone=$ZONE \
             --named-ports=http:8080
-    
+
+      - name: Wait for MIG to become HEALTHY
+        run: |
+          MIG=${{ steps.vars.outputs.mig_name }}
+          ZONE=${{ steps.vars.outputs.zone }}
+          BACKEND_SERVICE="onthetop-backend-service"
+
+          echo "⏳ Waiting for MIG to become HEALTHY..."
+
+          for i in {1..20}; do
+            STATUS=$(gcloud compute backend-services get-health $BACKEND_SERVICE --global \
+              --format="value(status.healthStatus[0].healthState)")
+
+            echo "Attempt $i: Health status = $STATUS"
+
+            if [ "$STATUS" = "HEALTHY" ]; then
+              echo "✅ MIG is healthy!"
+              exit 0
+            fi
+
+            sleep 15
+          done
+
+          echo "❌ MIG did not become healthy in time"
+          exit 1
+
       - name: Add MIG to Backend Service
         run: |
           MIG=${{ steps.vars.outputs.mig_name }}
