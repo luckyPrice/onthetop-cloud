@@ -80,7 +80,7 @@ jobs:
             --boot-disk-size=20GB \
             --service-account=213622576886-compute@developer.gserviceaccount.com \
             --scopes=https://www.googleapis.com/auth/cloud-platform \
-            --tags=http-server,https-server,onthetop-monitoring-target, onthetop-server \
+            --tags=http-server,https-server,onthetop-monitoring-target,onthetop-server \
             --metadata=startup-version=${{ steps.vars.outputs.version }} \
             --metadata-from-file=startup-script=scripts/cicd/startup-script.sh
 
