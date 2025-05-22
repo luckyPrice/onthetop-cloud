@@ -235,14 +235,25 @@ jobs:
       - name: Update CloudFront Origin
         run: |
           SLOT="${{ needs.deploy.outputs.fe_slot }}"
-          aws cloudfront get-distribution-config --id $CLOUDFRONT_DISTRIBUTION_ID > config.json
-          ETAG=$(jq -r '.ETag' config.json)
-          jq --arg SLOT "$SLOT" '
-            .DistributionConfig.Origins.Items[0].OriginPath = "/frontend/prod/\($SLOT)"
-          ' config.json > updated-config.json
+          DIST_ID="$CLOUDFRONT_DISTRIBUTION_ID"
 
+          # 원본 전체 구성 받아오기
+          aws cloudfront get-distribution-config --id $DIST_ID > raw.json
+
+          # ETag 추출
+          ETAG=$(jq -r '.ETag' raw.json)
+
+          # DistributionConfig만 추출
+          jq '.DistributionConfig' raw.json > config-only.json
+
+          # OriginPath 수정
+          jq --arg SLOT "$SLOT" \
+            '.Origins.Items[0].OriginPath = "/frontend/prod/\($SLOT)"' \
+            config-only.json > updated-config.json
+
+          # 업데이트 적용
           aws cloudfront update-distribution \
-            --id $CLOUDFRONT_DISTRIBUTION_ID \
+            --id $DIST_ID \
             --if-match $ETAG \
             --distribution-config file://updated-config.json
 
