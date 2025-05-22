@@ -3,18 +3,32 @@ name: Deploy Prod
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: '배포할 backend 버전 (예: 1.2.3)'
+      be_version:
+        description: '배포할 BE 버전 (예: 1.2.3)'
         required: true
-      deploy_slot:
-        description: 'Blue/Green 중 어느 슬롯에 배포할지 (예: blue, green)'
+      be_slot:
+        description: 'BE 슬롯 선택 (예: blue, green)'
+        required: true
+        default: 'green'
+      fe_version:
+        description: '배포할 FE 버전 (예: 1.2.3)'
+        required: true
+      fe_slot:
+        description: 'FE 슬롯 선택 (예: blue, green)'
         required: true
         default: 'green'
 
 jobs:
-  create-template-and-mig:
-    name: Create Template and MIG on GCP
+  deploy:
     runs-on: ubuntu-latest
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFRONT_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFRONT_SECRET_KEY }}
+      AWS_DEFAULT_REGION: ap-northeast-2
+      CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+      REGION: asia-northeast3
+      ZONE: asia-northeast3-a
 
     steps:
       - name: Checkout Infra Repo
@@ -31,19 +45,41 @@ jobs:
       - name: Set variables
         id: vars
         run: |
-          VERSION=${{ github.event.inputs.version }}
-          SLOT=${{ github.event.inputs.deploy_slot }}
-          REGION="asia-northeast3"
-          ZONE="asia-northeast3-a"
-          TEMPLATE_NAME="onthetop-backend-${SLOT}-v${VERSION//./-}"
-          MIG_NAME="onthetop-backend-${SLOT}"
-
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "slot=$SLOT" >> $GITHUB_OUTPUT
+          BE_VERSION="${{ github.event.inputs.be_version }}"
+          BE_SLOT="${{ github.event.inputs.be_slot }}"
+          FE_VERSION="${{ github.event.inputs.fe_version }}"
+          FE_SLOT="${{ github.event.inputs.fe_slot }}"
+          REGION="${{ env.REGION }}"
+          ZONE="${{ env.ZONE }}"
+      
+          TEMPLATE_NAME="onthetop-backend-${BE_SLOT}-v${BE_VERSION//./-}"
+          MIG_NAME="onthetop-backend-${BE_SLOT}"
+      
+          echo "be_version=$BE_VERSION" >> $GITHUB_OUTPUT
+          echo "be_slot=$BE_SLOT" >> $GITHUB_OUTPUT
+          echo "fe_version=$FE_VERSION" >> $GITHUB_OUTPUT
+          echo "fe_slot=$FE_SLOT" >> $GITHUB_OUTPUT
           echo "region=$REGION" >> $GITHUB_OUTPUT
           echo "zone=$ZONE" >> $GITHUB_OUTPUT
           echo "template_name=$TEMPLATE_NAME" >> $GITHUB_OUTPUT
           echo "mig_name=$MIG_NAME" >> $GITHUB_OUTPUT
+
+      # ------------------ FE 업로드 ------------------
+
+      - name: Download FE artifact from GitHub Release
+        run: |
+          curl -L -o fe.zip https://github.com/${{ github.repository }}/releases/download/v${{ steps.vars.outputs.fe_version }}/frontend-prod-build.zip
+          unzip -o fe.zip -d fe-dist
+
+      - name: Upload FE to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_KEY }}
+          AWS_DEFAULT_REGION: ap-northeast-2
+        run: |
+          aws s3 sync fe-dist/ s3://onthe-top/frontend/prod/${{ steps.vars.outputs.fe_slot }} --delete
+
+      # ------------------ BE 배포 ------------------
 
       - name: Clean up existing template/MIG if exists
         run: |
@@ -81,7 +117,7 @@ jobs:
             --service-account=213622576886-compute@developer.gserviceaccount.com \
             --scopes=https://www.googleapis.com/auth/cloud-platform \
             --tags=http-server,https-server,onthetop-monitoring-target,onthetop-server \
-            --metadata=startup-version=${{ steps.vars.outputs.version }} \
+            --metadata=startup-version=${{ steps.vars.outputs.be_version }} \
             --metadata-from-file=startup-script=scripts/cicd/startup-script.sh
 
       - name: Create Managed Instance Group (MIG)
@@ -184,3 +220,26 @@ jobs:
             --global \
             --instance-group=$OLD_MIG \
             --instance-group-zone=$ZONE || true
+
+      # ------------------ CloudFront Origin 변경 및 무효화 ------------------
+
+      - name: Update CloudFront Origin to FE slot
+        run: |
+          SLOT="${{ steps.vars.outputs.fe_slot }}"
+
+          aws cloudfront get-distribution-config --id $CLOUDFRONT_DISTRIBUTION_ID > config.json
+          ETAG=$(jq -r '.ETag' config.json)
+          jq --arg SLOT "$SLOT" '
+            .DistributionConfig.Origins.Items[0].OriginPath = "/frontend/prod/\($SLOT)"
+          ' config.json > updated-config.json
+
+          aws cloudfront update-distribution \
+            --id $CLOUDFRONT_DISTRIBUTION_ID \
+            --if-match $ETAG \
+            --distribution-config file://updated-config.json
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+            --paths "/frontend/prod/${{ steps.vars.outputs.fe_slot }}/*"
