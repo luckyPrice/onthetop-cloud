@@ -29,6 +29,7 @@ jobs:
       CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
       REGION: asia-northeast3
       ZONE: asia-northeast3-a
+      GH_FE_REPO: 100-hours-a-week/16-Hot6-fe
 
     steps:
       - name: Checkout Infra Repo
@@ -68,7 +69,7 @@ jobs:
 
       - name: Download FE artifact from GitHub Release
         run: |
-          curl -L -o fe.zip https://github.com/${{ github.repository }}/releases/download/v${{ steps.vars.outputs.fe_version }}/frontend-prod-build.zip
+          curl -L -o fe.zip https://github.com/$GH_FE_REPO/releases/download/v${{ steps.vars.outputs.fe_version }}/frontend-prod-build.zip
           unzip -o fe.zip -d fe-dist
 
       - name: Upload FE to S3
