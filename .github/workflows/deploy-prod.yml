@@ -21,12 +21,11 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    outputs:
+      fe_slot: ${{ steps.vars.outputs.fe_slot }}
 
     env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFRONT_ACCESS_KEY }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFRONT_SECRET_KEY }}
       AWS_DEFAULT_REGION: ap-northeast-2
-      CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
       REGION: asia-northeast3
       ZONE: asia-northeast3-a
       GH_FE_REPO: 100-hours-a-week/16-Hot6-fe
@@ -224,10 +223,18 @@ jobs:
 
       # ------------------ CloudFront Origin 변경 및 무효화 ------------------
 
-      - name: Update CloudFront Origin to FE slot
+  cdn-update:
+    needs: deploy
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFRONT_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFRONT_SECRET_KEY }}
+      AWS_DEFAULT_REGION: ap-northeast-2
+      CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+    steps:
+      - name: Update CloudFront Origin
         run: |
-          SLOT="${{ steps.vars.outputs.fe_slot }}"
-
+          SLOT="${{ needs.deploy.outputs.fe_slot }}"
           aws cloudfront get-distribution-config --id $CLOUDFRONT_DISTRIBUTION_ID > config.json
           ETAG=$(jq -r '.ETag' config.json)
           jq --arg SLOT "$SLOT" '
@@ -241,6 +248,7 @@ jobs:
 
       - name: Invalidate CloudFront cache
         run: |
+          SLOT="${{ needs.deploy.outputs.fe_slot }}"
           aws cloudfront create-invalidation \
             --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
-            --paths "/frontend/prod/${{ steps.vars.outputs.fe_slot }}/*"
+            --paths "/frontend/prod/$SLOT/*"
