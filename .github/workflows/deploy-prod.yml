@@ -262,4 +262,4 @@ jobs:
           SLOT="${{ needs.deploy.outputs.fe_slot }}"
           aws cloudfront create-invalidation \
             --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
-            --paths "/frontend/prod/$SLOT/*"
+            --paths "/" "/index.html" "/assets/*.js" "/assets/*.css"
