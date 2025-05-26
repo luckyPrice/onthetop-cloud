@@ -1,0 +1,107 @@
+name: Rollback Prod (Force)
+
+on:
+  workflow_dispatch:
+    inputs:
+      be_rollback_slot:
+        description: '현재 잘못 배포된 BE 슬롯 (예: blue, green)'
+        required: true
+      fe_rollback_slot:
+        description: '현재 잘못 배포된 FE 슬롯 (예: blue, green)'
+        required: true
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    env:
+      REGION: asia-northeast3
+      ZONE: asia-northeast3-a
+      BACKEND_SERVICE: onthetop-backend-service
+      AWS_DEFAULT_REGION: ap-northeast-2
+      CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+
+    steps:
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Set rollback variables
+        id: setvars
+        run: |
+          if [[ "${{ github.event.inputs.be_rollback_slot }}" == "blue" ]]; then
+            echo "prev_be_slot=blue" >> $GITHUB_OUTPUT
+            echo "restore_be_slot=green" >> $GITHUB_OUTPUT
+          else
+            echo "prev_be_slot=green" >> $GITHUB_OUTPUT
+            echo "restore_be_slot=blue" >> $GITHUB_OUTPUT
+          fi
+
+          if [[ "${{ github.event.inputs.fe_rollback_slot }}" == "blue" ]]; then
+            echo "prev_fe_slot=blue" >> $GITHUB_OUTPUT
+            echo "restore_fe_slot=green" >> $GITHUB_OUTPUT
+          else
+            echo "prev_fe_slot=green" >> $GITHUB_OUTPUT
+            echo "restore_fe_slot=blue" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Rollback Backend (Force)
+        run: |
+          OLD_MIG="onthetop-backend-${{ steps.setvars.outputs.prev_be_slot }}"
+          NEW_MIG="onthetop-backend-${{ steps.setvars.outputs.restore_be_slot }}"
+          ZONE="${{ env.ZONE }}"
+          BACKEND_SERVICE="${{ env.BACKEND_SERVICE }}"
+
+          echo "🔄 전환: $OLD_MIG → $NEW_MIG"
+
+          echo "🔍 $NEW_MIG MIG 존재 여부 확인 중..."
+          if ! gcloud compute instance-groups managed describe $NEW_MIG --zone=$ZONE >/dev/null 2>&1; then
+            echo "❌ $NEW_MIG MIG가 존재하지 않습니다. 롤백 중단."
+            exit 1
+          fi
+
+          gcloud compute backend-services add-backend $BACKEND_SERVICE \
+            --global \
+            --instance-group=$NEW_MIG \
+            --instance-group-zone=$ZONE || true
+
+          gcloud compute backend-services remove-backend $BACKEND_SERVICE \
+            --global \
+            --instance-group=$OLD_MIG \
+            --instance-group-zone=$ZONE || true
+
+          echo "🗑️ $OLD_MIG 삭제 중..."
+          gcloud compute instance-groups managed delete $OLD_MIG --zone=$ZONE --quiet || true
+  
+      - name: Update CloudFront FE origin
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFRONT_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFRONT_SECRET_KEY }}
+        run: |
+          SLOT="${{ steps.setvars.outputs.restore_fe_slot }}"
+          DIST_ID="${{ env.CLOUDFRONT_DISTRIBUTION_ID }}"
+
+          echo "FE CloudFront origin을 $SLOT로 전환 중..."
+
+          aws cloudfront get-distribution-config --id $DIST_ID > raw.json
+          ETAG=$(jq -r '.ETag' raw.json)
+          jq '.DistributionConfig' raw.json > config-only.json
+
+          jq --arg SLOT "$SLOT" \
+            '.Origins.Items[0].OriginPath = "/frontend/prod/\($SLOT)"' \
+            config-only.json > updated-config.json
+
+          aws cloudfront update-distribution \
+            --id "$DIST_ID" \
+            --if-match "$ETAG" \
+            --distribution-config file://updated-config.json
+
+      - name: Invalidate CloudFront cache
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFRONT_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFRONT_SECRET_KEY }}
+        run: |
+          echo "CloudFront 캐시 무효화 시작..."
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ env.CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths "/" "/index.html" "/assets/*.js" "/assets/*.css"
