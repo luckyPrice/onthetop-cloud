@@ -1,0 +1,36 @@
+name: Confirm Prod Deployment (Clean Old MIG)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_slot:
+        description: '배포된 슬롯 이름(예: blue, green) ❌삭제할 버전 아님❌'
+        required: true
+
+jobs:
+  confirm:
+    runs-on: ubuntu-latest
+    env:
+      ZONE: asia-northeast3-a
+
+    steps:
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Confirm deployment and clean old MIG
+        run: |
+          SLOT="${{ github.event.inputs.confirm_slot }}"
+          ZONE="$ZONE"
+
+          if [[ "$SLOT" == "blue" ]]; then
+            OLD_SLOT=green
+          else
+            OLD_SLOT=blue
+          fi
+
+          OLD_MIG="onthetop-backend-$OLD_SLOT"
+
+          echo "$OLD_MIG 를 삭제합니다..."
+          gcloud compute instance-groups managed delete $OLD_MIG --zone=$ZONE --quiet || true
