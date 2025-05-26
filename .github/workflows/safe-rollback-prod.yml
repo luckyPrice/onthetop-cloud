@@ -76,7 +76,8 @@ jobs:
 
           for i in {1..20}; do
             STATE=$(gcloud compute backend-services get-health "$BACKEND_SERVICE" --global --format=json | \
-              jq -r --arg MIG "$MIG_URL" '.[] | select(.backend == $MIG) | .status.healthStatus | map(.healthState) | unique | .[]')
+              jq -r --arg MIG "$MIG_URL" \
+                '.[] | select(.backend == $MIG) | (.status.healthStatus // []) | map(.healthState) | unique | .[]?')
 
             echo "⏳ 시도 $i: 상태 = $STATE"
             [[ "$STATE" == "HEALTHY" ]] && break
