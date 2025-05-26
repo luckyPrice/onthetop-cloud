@@ -36,7 +36,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.CLOUDFRONT_SECRET_KEY }}
           aws-region: ap-northeast-2
 
-      - name: Rollback Backend with Health Check
+      - name: Rollback Backend with MIG Health Check
         run: |
           SLOT="${{ github.event.inputs.be_slot }}"
           if [[ "$SLOT" == "blue" ]]; then
@@ -48,16 +48,39 @@ jobs:
           NEW_MIG="onthetop-backend-$TARGET"
           OLD_MIG="onthetop-backend-$SLOT"
           PROJECT=$(gcloud config get-value project)
+
+          echo "🔍 $TARGET MIG 인스턴스 그룹 헬스체크 중..."
+          for i in {1..20}; do
+            STATUS=$(gcloud compute instance-groups managed list-instances "$NEW_MIG" \
+              --zone="$ZONE" --format=json | \
+              jq -r 'map(.instanceStatus) | unique | .[]')
+
+            echo "⏳ 시도 $i: 인스턴스 상태 = $STATUS"
+            [[ "$STATUS" == "RUNNING" ]] && break
+            sleep 10
+          done
+
+          if [[ "$STATUS" != "RUNNING" ]]; then
+            echo "❌ MIG 인스턴스 그룹이 준비되지 않았습니다. 롤백 중단."
+            exit 1
+          fi
+
+          echo "✅ MIG 인스턴스 그룹 준비 완료. 백엔드에 연결 중..."
+          gcloud compute backend-services add-backend "$BACKEND_SERVICE" \
+            --global \
+            --instance-group="$NEW_MIG" \
+            --instance-group-zone="$ZONE"
+
+          echo "🔍 LB to MIG 헬스체크 확인 중..."
           MIG_URL="https://www.googleapis.com/compute/v1/projects/$PROJECT/zones/$ZONE/instanceGroups/$NEW_MIG"
 
-          echo "🔍 $TARGET MIG 상태 확인 중..."
           for i in {1..20}; do
-            STATE=$(gcloud compute backend-services get-health $BACKEND_SERVICE --global --format=json | \
-              jq -r --arg MIG "$MIG_URL" '.[] | select(.backend == $MIG) | .status.healthStatus[0].healthState // "UNKNOWN"')
+            STATE=$(gcloud compute backend-services get-health "$BACKEND_SERVICE" --global --format=json | \
+              jq -r --arg MIG "$MIG_URL" '.[] | select(.backend == $MIG) | .status.healthStatus | map(.healthState) | unique | .[]')
 
             echo "⏳ 시도 $i: 상태 = $STATE"
             [[ "$STATE" == "HEALTHY" ]] && break
-            sleep 15
+            sleep 10
           done
 
           if [[ "$STATE" != "HEALTHY" ]]; then
@@ -66,18 +89,13 @@ jobs:
           fi
 
           echo "✅ HEALTHY 상태 확인됨. 롤백 진행."
-          gcloud compute backend-services add-backend $BACKEND_SERVICE \
+          gcloud compute backend-services remove-backend "$BACKEND_SERVICE" \
             --global \
-            --instance-group=$NEW_MIG \
-            --instance-group-zone=$ZONE || true
-
-          gcloud compute backend-services remove-backend $BACKEND_SERVICE \
-            --global \
-            --instance-group=$OLD_MIG \
-            --instance-group-zone=$ZONE || true
+            --instance-group="$OLD_MIG" \
+            --instance-group-zone="$ZONE" || true
 
           echo "🧹 $OLD_MIG 삭제 중..."
-          gcloud compute instance-groups managed delete $OLD_MIG --zone=$ZONE --quiet || true
+          gcloud compute instance-groups managed delete "$OLD_MIG" --zone="$ZONE" --quiet || true
 
       - name: Rollback CloudFront FE Origin
         run: |
