@@ -1,0 +1,2 @@
+# mysql module outputs.tf
+

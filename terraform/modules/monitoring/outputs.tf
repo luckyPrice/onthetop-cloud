@@ -1,0 +1,2 @@
+# monitoring module outputs.tf
+

@@ -1,0 +1,2 @@
+# monitoring module variables.tf
+

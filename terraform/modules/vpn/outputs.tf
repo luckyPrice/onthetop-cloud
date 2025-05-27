@@ -1,0 +1,2 @@
+# vpn module outputs.tf
+
