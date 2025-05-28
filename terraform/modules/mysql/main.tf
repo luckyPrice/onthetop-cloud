@@ -1,2 +1,0 @@
-# mysql module main.tf
-

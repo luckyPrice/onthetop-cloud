@@ -1,2 +1,0 @@
-# vpc module main.tf
-

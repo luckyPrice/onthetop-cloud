@@ -1,2 +1,0 @@
-# mysql module variables.tf
-
