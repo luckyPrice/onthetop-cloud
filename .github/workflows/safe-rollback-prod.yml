@@ -1,0 +1,129 @@
+name: Rollback Prod (Safe)
+
+on:
+  workflow_dispatch:
+    inputs:
+      be_slot:
+        description: '현재 잘못 배포된 BE 슬롯 (예: blue, green)'
+        required: true
+      fe_slot:
+        description: '현재 잘못 배포된 FE 슬롯 (예: blue, green)'
+        required: true
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    env:
+      REGION: asia-northeast3
+      ZONE: asia-northeast3-a
+      BACKEND_SERVICE: onthetop-backend-service
+      CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+      AWS_DEFAULT_REGION: ap-northeast-2
+
+    steps:
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Set up gcloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Set up AWS CLI
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.CLOUDFRONT_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.CLOUDFRONT_SECRET_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: Rollback Backend with MIG Health Check
+        run: |
+          SLOT="${{ github.event.inputs.be_slot }}"
+          if [[ "$SLOT" == "blue" ]]; then
+            TARGET="green"
+          else
+            TARGET="blue"
+          fi
+
+          NEW_MIG="onthetop-backend-$TARGET"
+          OLD_MIG="onthetop-backend-$SLOT"
+          PROJECT=$(gcloud config get-value project)
+
+          echo "🔍 $TARGET MIG 인스턴스 그룹 헬스체크 중..."
+          for i in {1..20}; do
+            STATUS=$(gcloud compute instance-groups managed list-instances "$NEW_MIG" \
+              --zone="$ZONE" --format=json | \
+              jq -r 'map(.instanceStatus) | unique | .[]')
+
+            echo "⏳ 시도 $i: 인스턴스 상태 = $STATUS"
+            [[ "$STATUS" == "RUNNING" ]] && break
+            sleep 10
+          done
+
+          if [[ "$STATUS" != "RUNNING" ]]; then
+            echo "❌ MIG 인스턴스 그룹이 준비되지 않았습니다. 롤백 중단."
+            exit 1
+          fi
+
+          echo "✅ MIG 인스턴스 그룹 준비 완료. 백엔드에 연결 중..."
+          gcloud compute backend-services add-backend "$BACKEND_SERVICE" \
+            --global \
+            --instance-group="$NEW_MIG" \
+            --instance-group-zone="$ZONE"
+
+          echo "🔍 LB to MIG 헬스체크 확인 중..."
+          MIG_URL="https://www.googleapis.com/compute/v1/projects/$PROJECT/zones/$ZONE/instanceGroups/$NEW_MIG"
+
+          for i in {1..20}; do
+            STATE=$(gcloud compute backend-services get-health "$BACKEND_SERVICE" --global --format=json | \
+              jq -r --arg MIG "$MIG_URL" \
+                '.[] | select(.backend == $MIG) | (.status.healthStatus // []) | map(.healthState) | unique | .[]?')
+
+            echo "⏳ 시도 $i: 상태 = $STATE"
+            [[ "$STATE" == "HEALTHY" ]] && break
+            sleep 10
+          done
+
+          if [[ "$STATE" != "HEALTHY" ]]; then
+            echo "❌ HEALTHY 상태가 아님. 롤백 중단."
+            exit 1
+          fi
+
+          echo "✅ HEALTHY 상태 확인됨. 롤백 진행."
+          gcloud compute backend-services remove-backend "$BACKEND_SERVICE" \
+            --global \
+            --instance-group="$OLD_MIG" \
+            --instance-group-zone="$ZONE" || true
+
+          echo "🧹 $OLD_MIG 삭제 중..."
+          gcloud compute instance-groups managed delete "$OLD_MIG" --zone="$ZONE" --quiet || true
+
+      - name: Rollback CloudFront FE Origin
+        run: |
+          SLOT="${{ github.event.inputs.fe_slot }}"
+          if [[ "$SLOT" == "blue" ]]; then
+            TARGET="green"
+          else
+            TARGET="blue"
+          fi
+
+          echo "🔄 FE 슬롯을 $TARGET 으로 되돌립니다."
+          aws cloudfront get-distribution-config --id "$CLOUDFRONT_DISTRIBUTION_ID" > raw.json
+
+          ETAG=$(jq -r '.ETag' raw.json)
+          jq '.DistributionConfig' raw.json > config-only.json
+
+          jq --arg TARGET "$TARGET" \
+            '.Origins.Items[0].OriginPath = "/frontend/prod/\($TARGET)"' \
+            config-only.json > updated-config.json
+
+          aws cloudfront update-distribution \
+            --id "$CLOUDFRONT_DISTRIBUTION_ID" \
+            --if-match "$ETAG" \
+            --distribution-config file://updated-config.json
+
+      - name: Invalidate CloudFront Cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+            --paths "/" "/index.html" "/assets/*.js" "/assets/*.css"

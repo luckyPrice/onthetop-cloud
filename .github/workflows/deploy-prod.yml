@@ -108,17 +108,26 @@ jobs:
 
       - name: Create Instance Template
         run: |
-          gcloud compute instance-templates create ${{ steps.vars.outputs.template_name }} \
-            --machine-type=e2-small \
-            --region=${{ steps.vars.outputs.region }} \
-            --network-interface=subnet=onthetop-subnet-prod-private-server-a,no-address \
-            --image=projects/ubuntu-os-cloud/global/images/ubuntu-minimal-2404-noble-amd64-v20250514 \
-            --boot-disk-size=20GB \
-            --service-account=213622576886-compute@developer.gserviceaccount.com \
-            --scopes=https://www.googleapis.com/auth/cloud-platform \
-            --tags=http-server,https-server,onthetop-monitoring-target,onthetop-server \
-            --metadata=startup-version=${{ steps.vars.outputs.be_version }} \
-            --metadata-from-file=startup-script=scripts/cicd/startup-script.sh
+          TEMPLATE=${{ steps.vars.outputs.template_name }}
+      
+          echo "🔍 Checking if instance template $TEMPLATE exists..."
+          if gcloud compute instance-templates describe "$TEMPLATE" >/dev/null 2>&1; then
+            echo "✅ Instance template $TEMPLATE already exists. Skipping creation."
+          else
+            echo "🚀 Creating instance template $TEMPLATE..."
+            gcloud compute instance-templates create "$TEMPLATE" \
+              --machine-type=e2-small \
+              --region=${{ steps.vars.outputs.region }} \
+              --network-interface=subnet=onthetop-subnet-prod-private-server-a,no-address \
+              --image=projects/ubuntu-os-cloud/global/images/ubuntu-minimal-2404-noble-amd64-v20250514 \
+              --boot-disk-size=20GB \
+              --service-account=213622576886-compute@developer.gserviceaccount.com \
+              --scopes=https://www.googleapis.com/auth/cloud-platform \
+              --tags=http-server,https-server,onthetop-monitoring-target,onthetop-server \
+              --metadata=startup-version=${{ steps.vars.outputs.be_version }} \
+              --metadata-from-file=startup-script=scripts/cicd/startup-script.sh
+          fi
+          
 
       - name: Create Managed Instance Group (MIG)
         run: |
