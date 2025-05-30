@@ -1,2 +1,3 @@
-# instance module variables.tf
+# firewall module variables.tf
 
+variable "network" {}

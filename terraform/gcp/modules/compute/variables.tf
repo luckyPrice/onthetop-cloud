@@ -39,3 +39,9 @@ variable "external_ip" {
   default     = null
   description = "Optional static external IP address"
 }
+
+variable "tags" {
+  description = "Network tags to apply to the instance"
+  type        = list(string)
+  default     = []
+}
