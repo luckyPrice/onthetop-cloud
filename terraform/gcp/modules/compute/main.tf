@@ -3,7 +3,7 @@
 resource "google_compute_instance" "vm" {
   name         = var.name
   machine_type = var.machine_type
-  zone         = var.zone
+  zone         = var.zone != null ? var.zone : "asia-northeast3-a"
   tags         = var.tags
 
   boot_disk {

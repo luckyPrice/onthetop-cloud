@@ -15,7 +15,7 @@ variable "env" {
   description = "Environment (e.g. dev, prod)"
 }
 
-variable "backend_subnet_cidr" {
+variable "private_subnet_cidr" {
   type        = string
 }
 variable "db_subnet_cidr" {
