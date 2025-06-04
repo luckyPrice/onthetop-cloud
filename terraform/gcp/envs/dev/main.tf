@@ -1,7 +1,7 @@
-module "vpc" {
-  source              = "../../modules/vpc"
-  name                = local.vpc_name
-  region              = var.region
+# dev/main.tf
+
+data "google_compute_network" "vpc" {
+  name                = "onthetop-vpc"
 }
 
 module "subnet_private" {
@@ -9,7 +9,7 @@ module "subnet_private" {
   name     = local.private_subnet_name
   region   = var.region
   cidr     = var.private_subnet_cidr
-  network  = module.vpc.vpc_id
+  network  = data.google_compute_network.vpc.id
 }
 
 module "subnet_db" {
@@ -17,7 +17,7 @@ module "subnet_db" {
   name     = local.db_subnet_name
   region   = var.region
   cidr     = var.db_subnet_cidr
-  network  = module.vpc.vpc_id
+  network  = data.google_compute_network.vpc.id
 }
 
 module "backend_internal_ip" {
@@ -71,5 +71,5 @@ module "firewall" {
   port        = each.value.port
   source_ranges = each.value.source_ranges
   target_tag  = each.value.tag
-  network     = module.vpc.vpc_id
+  network  = data.google_compute_network.vpc.id
 }

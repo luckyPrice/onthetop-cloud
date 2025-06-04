@@ -2,11 +2,10 @@
 locals {
   prefix              = "onthetop"
   env_prefix          = "${local.prefix}-${var.env}"
-  vpc_name            = "${local.prefix}-vpc-${var.env}"
   private_subnet_name = "${local.prefix}-subnet-${var.env}-private"
   db_subnet_name      = "${local.prefix}-subnet-${var.env}-db"
-  backend_ip_name     = "${local.prefix}-ip-${var.env}-backend"
-  db_ip_name          = "${local.prefix}-ip-${var.env}-db"
+  backend_ip_name     = "${local.prefix}-iip-${var.env}-backend"
+  db_ip_name          = "${local.prefix}-iip-${var.env}-db"
   backend_name        = "${local.prefix}-compute-${var.env}-backend"
   db_name             = "${local.prefix}-compute-${var.env}-db"
 
