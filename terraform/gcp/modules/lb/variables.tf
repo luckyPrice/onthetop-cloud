@@ -1,2 +1,0 @@
-# lb module variables.tf
-
