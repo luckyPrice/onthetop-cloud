@@ -1,17 +1,5 @@
 # firewall module outputs.tf
 
-variable "name" {
-  type = string
-}
-
-variable "network" {
-  type = string
-}
-
-variable "port" {
-  type = string
-}
-
-variable "target_tag" {
-  type = string
+output "firewall_name" {
+  value = google_compute_firewall.allow_port.name
 }

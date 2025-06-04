@@ -4,9 +4,12 @@ resource "google_compute_firewall" "allow_port" {
   name    = var.name
   network = var.network
 
-  allow {
-    protocol = "tcp"
-    ports    = var.port
+  dynamic "allow" {
+    for_each = var.protocols
+    content {
+      protocol = allow.value
+      ports    = var.port
+    }
   }
 
   direction     = "INGRESS"

@@ -19,3 +19,8 @@ variable "target_tag" {
 variable "network" {
   type = string
 }
+
+variable "protocols" {
+  type    = list(string)
+  default = ["tcp"]
+}
