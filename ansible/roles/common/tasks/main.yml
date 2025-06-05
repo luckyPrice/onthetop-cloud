@@ -3,6 +3,7 @@
     name:
       - docker.io
       - rsync
+      - vim
     state: present
     update_cache: yes
 
