@@ -34,7 +34,7 @@ locals {
       source_ranges = ["10.0.0.0/8"]
       tag_suffix    = "https"
     },
-    https = {
+    monitoring-server = {
       name          = "monitoring-server"
       port          = ["3100"]
       protocols     = ["tcp"] 

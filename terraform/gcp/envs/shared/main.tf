@@ -54,7 +54,7 @@ module "shared_instance" {
   external_ip  = module.shared_external_ip.address
   ssh_keys     = var.ssh_keys
   tags         = [
-    for name in ["ssh", "http", "https", "vpn"] : local.firewall_expanded_rules[name].tag
+    for name in ["ssh", "http", "https", "monitoring-server", "vpn"] : local.firewall_expanded_rules[name].tag
   ]
 }
 
