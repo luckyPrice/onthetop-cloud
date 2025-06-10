@@ -1,0 +1,169 @@
+name: Confirm Prod Deployment (Clean Old Docker Slot)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_version:
+        description: '확정할 docker 배포 버전 (예: 1.2.3)'
+        required: true
+jobs:
+  confirm:
+    runs-on: ubuntu-latest
+
+    env:
+      REGION: asia-northeast3
+
+    steps:
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Set up gcloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Set variables
+        id: vars
+        run: |
+          REGION="${{ env.REGION }}"
+      
+          MIG_NAME="onthetop-mig-prod"
+      
+          echo "region=$REGION" >> $GITHUB_OUTPUT
+          echo "mig_name=$MIG_NAME" >> $GITHUB_OUTPUT
+
+      - name: Get list of backend instance IPs
+        id: get_ips
+        run: |
+
+          MIG="${{ steps.vars.outputs.mig_name }}"
+          REGION="${{ steps.vars.outputs.region }}"
+          INSTANCE_NAMES=$(gcloud compute instance-groups managed list-instances "$MIG" \
+            --region="$REGION" \
+            --format="get(instance)" | sed -n 's|.*/||p')
+          
+          if [ -z "$INSTANCE_NAMES" ]; then
+            echo "❌ MIG 인스턴스를 찾을 수 없습니다. MIG 이름과 REGION을 확인하세요."
+            exit 1
+          fi
+
+
+          ZONE_CANDIDATES=("asia-northeast3-a" "asia-northeast3-b" "asia-northeast3-c")
+
+          IP_LIST=""
+          for INSTANCE in $INSTANCE_NAMES; do
+            for TRY_ZONE in "${ZONE_CANDIDATES[@]}"; do
+              IP=$(gcloud compute instances describe "$INSTANCE" --zone "$TRY_ZONE" \
+                --format="get(networkInterfaces[0].networkIP)" 2>/dev/null) || continue
+              if [ -n "$IP" ]; then
+                echo "✅ $INSTANCE ($TRY_ZONE) → $IP"
+                IP_LIST+="$IP,"
+                break
+              fi
+            done
+          done
+
+          IP_LIST="${IP_LIST%,}"
+
+          echo " All IPs: $IP_LIST"
+          echo "slot_ips=$IP_LIST" >> $GITHUB_OUTPUT
+
+      - name: Set up SSH keys
+        run: |
+          mkdir -p ~/.ssh
+
+          echo "${{ secrets.JUMP_SSH_KEY }}" > ~/.ssh/jump_key
+          chmod 600 ~/.ssh/jump_key
+
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/dev_key
+          chmod 600 ~/.ssh/dev_key
+
+
+      - name: Confirm slot and remove old containers
+        env:
+            SLOT_IPS: ${{ steps.get_ips.outputs.slot_ips }}
+            CONFIRM_VERSION: ${{ github.event.inputs.confirm_version }}
+            JUMP_HOST: ${{ secrets.JUMP_SSH_HOST }}
+        run: |
+            mkdir -p ~/.ssh
+            ssh-keyscan -H "$JUMP_HOST" >> ~/.ssh/known_hosts
+
+            echo "📦 SLOT_IPS 값: $SLOT_IPS"
+            IFS=',' read -ra IPS <<< "$SLOT_IPS"
+            echo "🔍 분해된 IP 배열: ${IPS[@]}"
+            echo "🔍 배열 길이: ${#IPS[@]}"
+
+            for IP in "${IPS[@]}"; do
+            echo "🧹 Cleaning old slot on $IP..."
+
+            ssh -o StrictHostKeyChecking=no \
+                -o UserKnownHostsFile=/dev/null \
+                -o ProxyCommand="ssh -i ~/.ssh/jump_key -W %h:%p ubuntu@$JUMP_HOST" \
+                -i ~/.ssh/dev_key ubuntu@$IP \
+                CONFIRM_VERSION=$CONFIRM_VERSION bash -s <<'EOF'
+                set -ex
+
+
+                RUNNING_CONTAINERS=$(sudo docker ps --format '{{.Names}}' | grep '^onthetop-backend-' | wc -l)
+                INSTANCE_NAME=$(hostname)
+                SUMMARY+="[$INSTANCE_NAME] 🔎 실행 중 컨테이너 수: $RUNNING_CONTAINERS\n"
+
+                if [ "$RUNNING_CONTAINERS" -ne 2 ]; then
+                echo "❌ Error: '$INSTANCE_NAME' 인스턴스에서 실행 중인 컨테이너 수가 $RUNNING_CONTAINERS 개입니다."
+                sudo docker ps --format '  → {{.Names}}  ({{.Status}})' | grep '^  → onthetop-backend-' || true
+                exit 1
+                fi
+
+                BLUE_CONTAINER="onthetop-backend-blue"
+                GREEN_CONTAINER="onthetop-backend-green"
+
+                BLUE_VERSION=$(sudo docker inspect --format='{{index .Config.Image}}' "$BLUE_CONTAINER" 2>/dev/null | cut -d: -f2 || echo "")
+                GREEN_VERSION=$(sudo docker inspect --format='{{index .Config.Image}}' "$GREEN_CONTAINER" 2>/dev/null | cut -d: -f2 || echo "")
+
+                if [ "$BLUE_VERSION" = "$CONFIRM_VERSION" ] && [ "$GREEN_VERSION" = "$CONFIRM_VERSION" ]; then
+                echo "두 슬롯이 모두 version=$CONFIRM_VERSION 입니다. nginx 설정을 기준으로 하나만 유지합니다."
+
+                ACTIVE_PORT=$(grep "proxy_pass" /etc/nginx/sites-enabled/backend | grep -oE '[0-9]+')
+                if [ "$ACTIVE_PORT" = "8080" ]; then
+                    ACTIVE_SLOT=blue
+                else
+                    ACTIVE_SLOT=green
+                fi
+
+                for SLOT in blue green; do
+                    CONTAINER="onthetop-backend-$SLOT"
+                    if [ "$SLOT" = "$ACTIVE_SLOT" ]; then
+                    echo "✅ 유지: $CONTAINER (Nginx 사용중)"
+                    SUMMARY+="[$INSTANCE_NAME] ✅ 유지: $CONTAINER (Nginx 사용중)\n"
+                    else
+                    echo "🗑️ 삭제: $CONTAINER (동일 버전이나 비활성 슬롯)"
+                    sudo docker rm -f "$CONTAINER"
+                    SUMMARY+="[$INSTANCE_NAME] 🗑️ 삭제: $CONTAINER\n"
+                    fi
+                done
+
+                else
+                for SLOT in blue green; do
+                    CONTAINER="onthetop-backend-$SLOT"
+                    VERSION=$(sudo docker inspect --format='{{index .Config.Image}}' "$CONTAINER" 2>/dev/null | cut -d: -f2 || echo "")
+
+                    if [ "$VERSION" = "$CONFIRM_VERSION" ]; then
+                    echo "✅ 유지: $CONTAINER (version: $VERSION)"
+                    SUMMARY+="[$INSTANCE_NAME] ✅ 유지: $CONTAINER (version: $VERSION)\n"
+                    elif [ -n "$VERSION" ]; then
+                    echo "🗑️ 삭제: $CONTAINER (version: $VERSION ≠ $CONFIRM_VERSION)"
+                    sudo docker rm -f "$CONTAINER"
+                    SUMMARY+="[$INSTANCE_NAME] 🗑️ 삭제: $CONTAINER (old version)\n"
+                    else
+                    echo "❎ 존재하지 않음: $CONTAINER"
+                    SUMMARY+="[$INSTANCE_NAME] ❎ 존재하지 않음: $CONTAINER\n"
+                    fi
+                done
+                fi
+
+                echo -e "\n📋 [$INSTANCE_NAME] 컨테이너 정리 요약:"
+                echo -e "$SUMMARY"
+            EOF
+            done
+
+
