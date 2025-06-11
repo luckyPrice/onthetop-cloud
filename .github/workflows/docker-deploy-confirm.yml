@@ -5,7 +5,7 @@ on:
     inputs:
 
       confirm_version:
-        description: '확정할 docker 배포 버전 (예: 1.2.3)'
+        description: '확정할 docker 배포 버전 (예: v1.2.3)'
         required: true
 
 jobs:
