@@ -8,11 +8,6 @@ on:
         description: '확정할 docker 배포 버전 (예: 1.2.3)'
         required: true
 
-# on:
-#   push:
-#     branches:
-#       - feat/docker
-
 jobs:
   confirm:
     runs-on: ubuntu-latest
@@ -167,11 +162,11 @@ jobs:
                     SUMMARY+="[$INSTANCE_NAME] ✅ 유지: $CONTAINER (version: $VERSION)\n"
                   elif [ "$VERSION" = "$CONFIRM_VERSION" ]; then
                     echo "🗑️ 삭제: $CONTAINER (동일 버전이지만 Nginx가 사용하지 않음)"
-                    # sudo docker rm -f "$CONTAINER"
+                    sudo docker rm -f "$CONTAINER"
                     SUMMARY+="[$INSTANCE_NAME] 🗑️ 삭제: $CONTAINER (동일 버전이지만 비활성)\n"
                   elif [ -n "$VERSION" ]; then
                     echo "🗑️ 삭제: $CONTAINER (version: $VERSION ≠ $CONFIRM_VERSION)"
-                    # sudo docker rm -f "$CONTAINER"
+                    sudo docker rm -f "$CONTAINER"
                     SUMMARY+="[$INSTANCE_NAME] 🗑️ 삭제: $CONTAINER (version: $VERSION)\n"
                   else
                     echo "❎ 존재하지 않음: $CONTAINER"
