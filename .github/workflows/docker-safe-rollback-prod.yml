@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       be_version:
-        description: '현재 잘못 배포된 docker 배포 버전 (예: v1.2.3)'
+        description: '현재 잘못 배포된 docker 배포 버전 (예: 1.2.3)'
         required: true
       fe_slot:
         description: '현재 잘못 배포된 FE 슬롯 (예: blue, green)'
@@ -94,9 +94,10 @@ jobs:
       - name: Rollback Backend with MIG Health Check
         env:
           SLOT_IPS: ${{ steps.get_ips.outputs.slot_ips }}
-          CANCEL_VERSION: ${{ github.event.inputs.be_version }}
+          RAW_CANCEL_VERSION: ${{ github.event.inputs.be_version }}
           JUMP_HOST: ${{ secrets.JUMP_SSH_HOST }}
         run: |
+          CANCEL_VERSION="v$RAW_CANCEL_VERSION"
           mkdir -p ~/.ssh
           ssh-keyscan -H "$JUMP_HOST" >> ~/.ssh/known_hosts
           echo "📦 SLOT_IPS 값: $SLOT_IPS"

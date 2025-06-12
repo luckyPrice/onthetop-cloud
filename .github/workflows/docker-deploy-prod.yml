@@ -24,8 +24,6 @@ jobs:
       AWS_DEFAULT_REGION: ap-northeast-2
       REGION: asia-northeast3
       GH_FE_REPO: 100-hours-a-week/16-Hot6-fe
-      # 테스트
-      # BE_VERSION: "v1.0.1"
 
     steps:
       - name: Checkout Infra Repo
@@ -42,7 +40,8 @@ jobs:
       - name: Set variables
         id: vars
         run: |
-          BE_VERSION="${{ github.event.inputs.be_version }}"
+          RAW_BE_VERSION="${{ github.event.inputs.be_version }}"
+          BE_VERSION="v$RAW_BE_VERSION"
           FE_VERSION="${{ github.event.inputs.fe_version }}"
           FE_SLOT="${{ github.event.inputs.fe_slot }}"
           REGION="${{ env.REGION }}"
