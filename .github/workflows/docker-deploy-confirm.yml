@@ -194,3 +194,9 @@ jobs:
         run: |
           echo -n "$CONFIRM_VERSION" > be-version.txt
           gcloud secrets versions add confirmed-backend-version --data-file=be-version.txt
+
+      - name: Verify confirmed version from GCP Secret Manager
+        run: |
+          echo "🔍 확인 중: Secret 최신 버전 값 가져오기..."
+          PAYLOAD=$(gcloud secrets versions access latest --secret=confirmed-backend-version)
+          echo "✅ GCP에 저장된 최신 버전: $PAYLOAD"
