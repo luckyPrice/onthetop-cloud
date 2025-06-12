@@ -180,3 +180,10 @@ jobs:
                 echo -e "$SUMMARY"
             EOF
             done
+
+      - name: Update confirmed version in GCP Secret Manager
+        env:
+            CONFIRM_VERSION: ${{ github.event.inputs.confirm_version }}
+        run: |
+          echo -n "$CONFIRM_VERSION" > be-version.txt
+          gcloud secrets versions add confirmed-backend-version --data-file=be-version.txt
