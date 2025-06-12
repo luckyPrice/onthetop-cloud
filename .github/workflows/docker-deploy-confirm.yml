@@ -89,7 +89,7 @@ jobs:
       - name: Confirm slot and remove old containers
         env:
             SLOT_IPS: ${{ steps.get_ips.outputs.slot_ips }}
-            RAW_CONFIRM_VERSION: "v1.0.2"
+            RAW_CONFIRM_VERSION: "1.0.2"
             # RAW_CONFIRM_VERSION: ${{ github.event.inputs.confirm_version }}
             JUMP_HOST: ${{ secrets.JUMP_SSH_HOST }}
         run: |
