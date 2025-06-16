@@ -111,6 +111,7 @@ jobs:
             ssh -o StrictHostKeyChecking=no \
                 -o UserKnownHostsFile=/dev/null \
                 -o ProxyCommand="ssh -i ~/.ssh/jump_key -W %h:%p ubuntu@$JUMP_HOST" -i ~/.ssh/dev_key ubuntu@$IP \
+
                 CANCEL_VERSION=$CANCEL_VERSION bash -s <<'EOF'
                 set -ex
 
@@ -130,8 +131,6 @@ jobs:
 
                 BLUE_VERSION=$(sudo docker inspect --format='{{index .Config.Image}}' "$BLUE_CONTAINER" 2>/dev/null | cut -d: -f2 || echo "")
                 GREEN_VERSION=$(sudo docker inspect --format='{{index .Config.Image}}' "$GREEN_CONTAINER" 2>/dev/null | cut -d: -f2 || echo "")
-
-          
 
                 ACTIVE_PORT=$(grep "proxy_pass" /etc/nginx/sites-enabled/backend | grep -oE '[0-9]+')
                 if [ "$ACTIVE_PORT" = "8080" ]; then
@@ -158,7 +157,7 @@ jobs:
                   echo "❌ 롤백 대상 슬롯이 문제 버전($CANCEL_VERSION)과 동일합니다. 롤백 불가."
                   exit 1
                 fi
-                
+
                 echo " 현재 슬롯: $ACTIVE_SLOT → 롤백 슬롯: $OLD_SLOT (포트: $OLD_PORT)"
 
                 # ✅ Health check

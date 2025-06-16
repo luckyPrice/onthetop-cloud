@@ -3,7 +3,6 @@ name: Confirm Prod Deployment (Clean Old Docker Slot)
 on:
   workflow_dispatch:
     inputs:
-
       confirm_version:
         description: '확정할 docker 배포 버전 (예: 1.2.3)'
         required: true
