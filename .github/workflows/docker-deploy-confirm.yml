@@ -6,6 +6,7 @@ on:
       confirm_version:
         description: '확정할 docker 배포 버전 (예: 1.2.3)'
         required: true
+
 jobs:
   confirm:
     runs-on: ubuntu-latest
@@ -82,9 +83,10 @@ jobs:
       - name: Confirm slot and remove old containers
         env:
             SLOT_IPS: ${{ steps.get_ips.outputs.slot_ips }}
-            CONFIRM_VERSION: ${{ github.event.inputs.confirm_version }}
+            RAW_CONFIRM_VERSION: ${{ github.event.inputs.confirm_version }}
             JUMP_HOST: ${{ secrets.JUMP_SSH_HOST }}
         run: |
+            CONFIRM_VERSION="v$RAW_CONFIRM_VERSION"
             mkdir -p ~/.ssh
             ssh-keyscan -H "$JUMP_HOST" >> ~/.ssh/known_hosts
 
@@ -106,7 +108,7 @@ jobs:
 
                 RUNNING_CONTAINERS=$(sudo docker ps --format '{{.Names}}' | grep '^onthetop-backend-' | wc -l)
                 INSTANCE_NAME=$(hostname)
-                SUMMARY+="[$INSTANCE_NAME] 🔎 실행 중 컨테이너 수: $RUNNING_CONTAINERS\n"
+                SUMMARY+="[$INSTANCE_NAME] 🔎 처음 실행 중 컨테이너 수: $RUNNING_CONTAINERS\n"
 
                 if [ "$RUNNING_CONTAINERS" -ne 2 ]; then
                 echo "❌ Error: '$INSTANCE_NAME' 인스턴스에서 실행 중인 컨테이너 수가 $RUNNING_CONTAINERS 개입니다."
@@ -114,56 +116,73 @@ jobs:
                 exit 1
                 fi
 
-                BLUE_CONTAINER="onthetop-backend-blue"
-                GREEN_CONTAINER="onthetop-backend-green"
-
-                BLUE_VERSION=$(sudo docker inspect --format='{{index .Config.Image}}' "$BLUE_CONTAINER" 2>/dev/null | cut -d: -f2 || echo "")
-                GREEN_VERSION=$(sudo docker inspect --format='{{index .Config.Image}}' "$GREEN_CONTAINER" 2>/dev/null | cut -d: -f2 || echo "")
-
-                if [ "$BLUE_VERSION" = "$CONFIRM_VERSION" ] && [ "$GREEN_VERSION" = "$CONFIRM_VERSION" ]; then
-                echo "두 슬롯이 모두 version=$CONFIRM_VERSION 입니다. nginx 설정을 기준으로 하나만 유지합니다."
-
+                # 1. 현재 Nginx가 바라보는 포트 확인
                 ACTIVE_PORT=$(grep "proxy_pass" /etc/nginx/sites-enabled/backend | grep -oE '[0-9]+')
+
+                # 2. 각 슬롯의 버전 확인
+                BLUE_VERSION=$(sudo docker inspect --format='{{index .Config.Image}}' onthetop-backend-blue 2>/dev/null | cut -d: -f2 || echo "")
+                GREEN_VERSION=$(sudo docker inspect --format='{{index .Config.Image}}' onthetop-backend-green 2>/dev/null | cut -d: -f2 || echo "")
+
+                # 3. ACTIVE_PORT 기준으로 실제 Nginx가 사용하는 슬롯 결정
                 if [ "$ACTIVE_PORT" = "8080" ]; then
-                    ACTIVE_SLOT=blue
+                  ACTIVE_SLOT=blue
+                elif [ "$ACTIVE_PORT" = "8081" ]; then
+                  ACTIVE_SLOT=green
                 else
-                    ACTIVE_SLOT=green
+                  echo "❌ Nginx 설정에서 포트를 찾을 수 없습니다."
+                  exit 1
                 fi
 
-                for SLOT in blue green; do
-                    CONTAINER="onthetop-backend-$SLOT"
-                    if [ "$SLOT" = "$ACTIVE_SLOT" ]; then
-                    echo "✅ 유지: $CONTAINER (Nginx 사용중)"
-                    SUMMARY+="[$INSTANCE_NAME] ✅ 유지: $CONTAINER (Nginx 사용중)\n"
-                    else
-                    echo "🗑️ 삭제: $CONTAINER (동일 버전이나 비활성 슬롯)"
-                    sudo docker rm -f "$CONTAINER"
-                    SUMMARY+="[$INSTANCE_NAME] 🗑️ 삭제: $CONTAINER\n"
-                    fi
-                done
+                # 4. Nginx가 바라보는 컨테이너가 CONFIRM_VERSION인지 확인
+                ACTIVE_CONTAINER="onthetop-backend-$ACTIVE_SLOT"
+                ACTIVE_VERSION=$(sudo docker inspect --format='{{index .Config.Image}}' "$ACTIVE_CONTAINER" 2>/dev/null | cut -d: -f2 || echo "")
 
-                else
-                for SLOT in blue green; do
-                    CONTAINER="onthetop-backend-$SLOT"
-                    VERSION=$(sudo docker inspect --format='{{index .Config.Image}}' "$CONTAINER" 2>/dev/null | cut -d: -f2 || echo "")
 
-                    if [ "$VERSION" = "$CONFIRM_VERSION" ]; then
+                IS_RUNNING=$(sudo docker inspect -f '{{.State.Running}}' "$ACTIVE_CONTAINER" 2>/dev/null || echo "false")
+                if [ "$IS_RUNNING" != "true" ]; then
+                  echo "❌ Error: Nginx가 바라보는 컨테이너 '$ACTIVE_CONTAINER'가 실행 중이 아닙니다!"
+                  sudo docker ps -a --format '→ {{.Names}} ({{.Status}})' | grep onthetop-backend- || true
+                  exit 1
+                fi
+
+
+                if [ "$ACTIVE_VERSION" != "$CONFIRM_VERSION" ]; then
+                  echo "❌ Error: Nginx가 바라보는 슬롯 $ACTIVE_SLOT의 버전($ACTIVE_VERSION)이 CONFIRM_VERSION($CONFIRM_VERSION)과 다릅니다."
+                  exit 1
+                fi
+
+                echo "✅ Nginx가 바라보는 슬롯 '$ACTIVE_SLOT'의 버전이 CONFIRM_VERSION=$CONFIRM_VERSION 과 일치합니다. 불필요한 슬롯을 정리합니다..."
+
+                # 5. 불필요한 슬롯 제거
+                for SLOT in blue green; do
+                  CONTAINER="onthetop-backend-$SLOT"
+                  VERSION=$(sudo docker inspect --format='{{index .Config.Image}}' "$CONTAINER" 2>/dev/null | cut -d: -f2 || echo "")
+                  if [ "$SLOT" = "$ACTIVE_SLOT" ]; then
                     echo "✅ 유지: $CONTAINER (version: $VERSION)"
                     SUMMARY+="[$INSTANCE_NAME] ✅ 유지: $CONTAINER (version: $VERSION)\n"
-                    elif [ -n "$VERSION" ]; then
+                  elif [ "$VERSION" = "$CONFIRM_VERSION" ]; then
+                    echo "🗑️ 삭제: $CONTAINER (동일 버전이지만 Nginx가 사용하지 않음)"
+                    sudo docker rm -f "$CONTAINER"
+                    SUMMARY+="[$INSTANCE_NAME] 🗑️ 삭제: $CONTAINER (동일 버전이지만 비활성)\n"
+                  elif [ -n "$VERSION" ]; then
                     echo "🗑️ 삭제: $CONTAINER (version: $VERSION ≠ $CONFIRM_VERSION)"
                     sudo docker rm -f "$CONTAINER"
-                    SUMMARY+="[$INSTANCE_NAME] 🗑️ 삭제: $CONTAINER (old version)\n"
-                    else
+                    SUMMARY+="[$INSTANCE_NAME] 🗑️ 삭제: $CONTAINER (version: $VERSION)\n"
+                  else
                     echo "❎ 존재하지 않음: $CONTAINER"
                     SUMMARY+="[$INSTANCE_NAME] ❎ 존재하지 않음: $CONTAINER\n"
-                    fi
+                  fi
                 done
-                fi
+                
 
                 echo -e "\n📋 [$INSTANCE_NAME] 컨테이너 정리 요약:"
                 echo -e "$SUMMARY"
             EOF
             done
 
-
+      - name: Update confirmed version in GCP Secret Manager
+        env:
+            CONFIRM_VERSION: ${{ github.event.inputs.confirm_version }}
+        run: |
+          echo -n "$CONFIRM_VERSION" > be-version.txt
+          gcloud secrets versions add confirmed-backend-version --data-file=be-version.txt
