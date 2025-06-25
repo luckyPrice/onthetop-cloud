@@ -178,6 +178,10 @@ jobs:
                   -v /home/ubuntu/backend/secrets.properties:/app/secrets.properties \
                   -v /var/log/onthetop/backend:/logs \
                   -e SPRING_PROFILES_ACTIVE=prod \
+                  -e OTEL_EXPORTER_OTLP_ENDPOINT=http://$JUMP_HOST:4317 \
+                  -e OTEL_EXPORTER_OTLP_PROTOCOL=grpc \
+                  -e OTEL_RESOURCE_ATTRIBUTES=service.name=onthetop-backend-prod \
+                  -e OTEL_METRICS_EXPORTER=none \
                   luckyprice1103/onthetop-backend:$BE_VERSION \
                   --logging.file.name=/logs/backend.log \
                   --spring.config.additional-location=file:/app/secrets.properties
@@ -206,6 +210,9 @@ jobs:
                 echo "server {
                   listen 80;
                   server_name _;
+
+                  client_max_body_size 7M;
+
                   location / {
                     proxy_pass http://localhost:$PORT;
                     proxy_set_header Host \$host;
