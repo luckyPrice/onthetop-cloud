@@ -137,7 +137,7 @@ jobs:
             ssh -o StrictHostKeyChecking=no \
                 -o UserKnownHostsFile=/dev/null \
                 -o ProxyCommand="ssh -i ~/.ssh/jump_key -W %h:%p ubuntu@$JUMP_HOST" -i ~/.ssh/dev_key ubuntu@$IP \
-                BE_VERSION=$BE_VERSION bash -s <<'EOF'
+                JUMP_HOST=$JUMP_HOST BE_VERSION=$BE_VERSION bash -s <<'EOF'
                 set -ex
 
 
