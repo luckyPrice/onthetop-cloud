@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-backend-app # 배포의 이름 (Deployment name)
+  labels:
+    app: my-backend-app
+spec:
+  replicas: 2 # 실행할 파드(Pod)의 복제본 수 (Number of Pod replicas to run)
+  selector:
+    matchLabels:
+      app: my-backend-app # 이 Deployment가 관리할 파드를 선택하는 레이블 (Label to select Pods managed by this Deployment)
+  template:
+    metadata:
+      labels:
+        app: my-backend-app # 파드에 적용될 레이블 (Labels applied to the Pod)
+    spec:
+      containers:
+      - name: backend-container # 컨테이너의 이름 (Container name)
+        image: luckyprice1103/onthetop-backend:v2.0.3 # Docker Hub 이미지 경로 및 버전 (Docker Hub image path and version)
+        ports:
+        - containerPort: 8080 # 컨테이너가 노출하는 포트 (Port the container exposes)
+        env: 
+        - name: DATABASE_HOST
+          value: "my-database-service" # 예시: 데이터베이스 서비스 주소 (Example: Database service address)
+        - name: DATABASE_PORT
+          value: "5432" # 예시: 데이터베이스 포트 (Example: Database port)
+        # imagePullSecrets: # (선택 사항) 만약 Docker Hub 이미지가 private인 경우 필요 (Optional: Required if Docker Hub image is private)
+        # - name: regcred # kubectl create secret docker-registry로 생성된 시크릿 이름 (Name of the secret created with kubectl create secret docker-registry)
+      # serviceAccountName: my-backend-service-account # (선택 사항) 서비스 계정 사용 시 (Optional: If using a Service Account)

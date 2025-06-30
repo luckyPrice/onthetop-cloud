@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-backend-service # 서비스의 이름 (Service name)
+  labels:
+    app: my-backend-app
+spec:
+  selector:
+    app: my-backend-app # 이 서비스가 연결될 파드를 선택하는 레이블 (Label to select Pods this Service connects to)
+  ports:
+    - protocol: TCP
+      port: 80 # 서비스가 노출할 포트 (Port the Service exposes)
+      targetPort: 8080 # 파드 컨테이너의 포트 (Port on the Pod container)
+  type: ClusterIP # 서비스 타입: ClusterIP (클러스터 내부), NodePort, LoadBalancer (외부 접근) (Service type: ClusterIP (internal), NodePort, LoadBalancer (external access))
