@@ -45,9 +45,16 @@ output "configure_kubectl" {
 # 이 비밀번호로 Argo CD UI에 'admin' 사용자로 로그인합니다. (Login to Argo CD UI with 'admin' user using this password.)
 output "argocd_initial_admin_password" {
   description = "The initial admin password for Argo CD" # Argo CD의 초기 관리자 비밀번호
-  value     = base64decode(data.kubernetes_secret.argocd_initial_admin_secret.data["password"])
+  value     = data.kubernetes_secret.argocd_initial_admin_secret.data["password"]
   sensitive = true # 민감한 정보로 표시 (Mark as sensitive)
 }
+# Argo CD 서버 로드 밸런서 URL (Argo CD Server Load Balancer URL)
+output "argocd_server_url" {
+  description = "The external URL for the Argo CD server (LoadBalancer)" # Argo CD 서버의 외부 URL (로드 밸런서)
+  # LoadBalancer Ingress 호스트네임이 존재할 경우에만 값을 출력합니다.
+  value       = try(data.kubernetes_service.argocd_server.status[0].load_balancer[0].ingress[0].hostname, "")
+}
+
 
 # Argo CD CLI/UI 접근 명령어 (Port Forwarding) (Argo CD CLI/UI Access Command - Port Forwarding)
 output "argocd_port_forward_command" {

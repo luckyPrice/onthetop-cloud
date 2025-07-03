@@ -67,12 +67,12 @@ variable "eks_node_min_size" {
 variable "eks_node_max_size" {
   description = "Maximum number of nodes in the EKS node group" # EKS 노드 그룹의 최대 노드 수
   type        = number
-  default     = 2
+  default     = 3
 }
 
 # 노드 그룹 희망 수 (Node Group Desired Size)
 variable "eks_node_desired_size" {
   description = "Desired number of nodes in the EKS node group" # EKS 노드 그룹의 희망 노드 수
   type        = number
-  default     = 1
+  default     = 3
 }

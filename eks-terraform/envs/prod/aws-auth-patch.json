@@ -1,0 +1,1 @@
+{"data":{"mapUsers":"- userarn: arn:aws:iam::514883192355:user/terraform-user\n  username: terraform-admin\n  groups:\n    - system:masters\n"}}
